@@ -17,7 +17,7 @@ module.exports.permissionMiddleWare =  (permission) =>{
             }).lean().select("role_slug");
             if(!exitAccount){
                 return res.status(400).json({
-                    message: "Tài khoản không tồn tại"
+                    message: "Tài khoản admin không tồn tại"
                 })
             }
             const exitRole = await Role.findOne({
