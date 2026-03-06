@@ -2,12 +2,12 @@ const express = require("express");
 const router = express.Router();
 
 const controller = require("../../Controller/Admin/accounts.controller");
-const validate = require("../../Validate/Admin/products.valiable")
+const validate = require("../../Validate/Admin/account.validate")
 
 router.get("/", controller.index);
 router.post(
     "/create", 
-    validate.productValiable,
+    validate.accountValiable,
     controller.create
 );
 
