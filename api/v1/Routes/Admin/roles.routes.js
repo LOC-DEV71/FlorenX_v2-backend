@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const controller = require("../../Controller/Admin/role.controller");
+const roleValidate = require("../../Validate/Admin/role.validate");
 
 const multer = require("multer");
 const upload = multer({
@@ -19,6 +20,7 @@ router.get("/", controller.index)
 
 router.post(
     "/create", 
+    roleValidate.roleValidate,
     upload.fields([
         {name: "thumbnail", maxCount: 1 }
     ]),
