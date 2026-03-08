@@ -1,6 +1,7 @@
 const Account = require("../../Models/accounts.model");
 const bcrypt = require("bcryptjs");
 const jwtUtils = require("../../../../utils/jwt.utils");
+
 module.exports.login = async (req, res) => {
     try {
         const {email, password} = req.body;
@@ -46,7 +47,7 @@ module.exports.logout = async (req, res) => {
         
 
         return res.status(200).json({
-            message: "Đặng nhập thành công"
+            message: "Đã đăng xuất"
         })
     } catch (error) {
         return res.status(400).json({

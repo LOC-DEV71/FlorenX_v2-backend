@@ -1,97 +1,99 @@
 const mongoose = require("mongoose");
 
 const productSchema = new mongoose.Schema(
-{
-  title: String,
+  {
+    title: String,
 
-  product_category_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "ProductCategory"
-  },
+    product_category_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ProductCategory"
+    },
 
-  description: String,
+    description: String,
 
-  price: Number,
+    price: Number,
 
-  discountPercentage: {
-    type: Number,
-    default: 0
-  },
+    discountPercentage: {
+      type: Number,
+      default: 0
+    },
 
-  stock: Number,
+    stock: Number,
 
-  thumbnail: String,
+    thumbnail: String,
 
-  images: {
-    type: [String],
-    default: []
-  },
+    images: {
+      type: [String],
+      default: []
+    },
 
-  status: {
-    type: String,
-    enum: ["active", "inactive"],
-    default: "active"
-  },
+    brand: String,
 
-  featured: {
-    type: Boolean,
-    default: false
-  },
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active"
+    },
 
-  position: {
-    type: Number,
-    default: 0
-  },
+    featured: {
+      type: Boolean,
+      default: false
+    },
 
-  slug: {
-    type: String,
-    unique: true,
-    index: true
-  },
+    position: {
+      type: Number,
+      default: 0
+    },
 
-  specs: {
-    type: Map,
-    of: String,
-    default: {}
-  },
+    slug: {
+      type: String,
+      unique: true,
+      index: true
+    },
 
-  rating_avg: {
-    type: Number,
-    default: 0
-  },
+    specs: {
+      type: Map,
+      of: String,
+      default: {}
+    },
 
-  rating_count: {
-    type: Number,
-    default: 0
-  },
+    rating_avg: {
+      type: Number,
+      default: 0
+    },
 
-  createdBy: {
-    account_id: String,
-    createdAt: {
-      type: Date,
-      default: Date.now
-    }
-  },
+    rating_count: {
+      type: Number,
+      default: 0
+    },
 
-  deleted: {
-    type: Boolean,
-    default: false
-  },
-
-  deletedBy: {
-    account_id: String,
-    deletedAt: Date
-  },
-
-  updatedBy: [
-    {
+    createdBy: {
       account_id: String,
-      updatedAt: Date
-    }
-  ]
+      createdAt: {
+        type: Date,
+        default: Date.now
+      }
+    },
 
-},
-{ timestamps: true }
+    deleted: {
+      type: Boolean,
+      default: false
+    },
+
+    deletedBy: {
+      account_id: String,
+      deletedAt: Date
+    },
+
+    updatedBy: [
+      {
+        account_id: String,
+        updatedAt: Date
+      }
+    ]
+
+  },
+  { timestamps: true }
 );
 
 const Product = mongoose.model("Product", productSchema, "products");
