@@ -36,8 +36,9 @@ const productSchema = new mongoose.Schema(
     },
 
     featured: {
-      type: Boolean,
-      default: false
+      type: String,
+      enum: ["yes", "no"],
+      default: "no"
     },
 
     position: {

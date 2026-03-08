@@ -32,7 +32,8 @@ module.exports.productValiable = async (req, res, next) => {
         next();
     } catch (error) {
         return res.status(400).json({
-            message: `Lỗi: ${error}`
+            message: `Lỗi: ${error}`,
+            code: false
         })
     }
 }

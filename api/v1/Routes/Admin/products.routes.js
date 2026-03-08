@@ -16,6 +16,7 @@ const upload = multer({
 const cloudinary = require("../../../../service/cloudinary.service");
 
 router.get("/", controller.index);
+router.post("/change-multi", controller.changeMulti);
 router.post(
     "/create",
     
