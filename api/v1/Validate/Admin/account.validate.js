@@ -1,6 +1,6 @@
 const isEmail = require("../../../../helper/isEmail.helper");
 const isStrongPassword = require("../../../../helper/isStrongPassword.helper");
-module.exports.accountValiable = async (req, res, next) => {
+module.exports.accountValidate = async (req, res, next) => {
     try {
         if(!req.body.fullname){
             return res.status(400).json({

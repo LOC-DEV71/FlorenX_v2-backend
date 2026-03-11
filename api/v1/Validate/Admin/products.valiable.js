@@ -1,5 +1,6 @@
-module.exports.productValiable = async (req, res, next) => {
+module.exports.productValidate = async (req, res, next) => {
     try {
+
         if(req.body.stock){
             req.body.stock = Number(req.body.stock);
         }
@@ -10,7 +11,8 @@ module.exports.productValiable = async (req, res, next) => {
 
         if(!req.body.title){
             return res.status(400).json({
-                message: "Vui lòng nhập tên sản phẩm"
+                message: "Vui lòng nhập tên sản phẩm",
+                code: false
             })
         }
         // if(!req.body.product_category_id){
@@ -20,12 +22,14 @@ module.exports.productValiable = async (req, res, next) => {
         // }
         if(req.body.price <= 0){
             return res.status(400).json({
-                message: "Vui lòng nhập giá"
+                message: "Vui lòng nhập giá",
+                code: false
             })
         }
         if(req.body.stock <= 0){
             return res.status(400).json({
-                message: "Vui lòng nhập số lượng sản phẩm"
+                message: "Vui lòng nhập số lượng sản phẩm",
+                code: false
             })
         }
 

@@ -10,14 +10,16 @@ module.exports.login = async (req, res) => {
         }).lean();
         if(!exitEmail){
             return res.status(400).json({
-                message: "Email không tồn tại"
+                message: "Email không tồn tại",
+                code: false
             })
         }
         const isMatch = await bcrypt.compare(password, exitEmail.password);
 
         if(!isMatch){
             return res.status(400).json({
-                message: "Mật khẩu không chính xác"
+                message: "Mật khẩu không chính xác",
+                code: false
             })
         }
 
@@ -34,11 +36,13 @@ module.exports.login = async (req, res) => {
         });
 
         return res.status(200).json({
-            message: "Đặng nhập thành công"
+            message: "Đặng nhập thành công",
+            code: true
         })
     } catch (error) {
         return res.status(400).json({
-            message: `Lỗi: ${error}`
+            message: `Lỗi: ${error}`,
+            code: false
         })
     }
 }
@@ -48,6 +52,26 @@ module.exports.logout = async (req, res) => {
 
         return res.status(200).json({
             message: "Đã đăng xuất"
+        })
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error}`
+        })
+    }
+}
+module.exports.getAdmin = async (req, res) => {
+    try {
+        const token = req.cookies.token;
+        const dedcode = jwtUtils.verifyToken(token);
+        
+        const admin = await Account.findOne({
+            _id: dedcode.id
+        }).select("-password -_id")
+        
+        return res.status(200).json({
+            message: "Lấy thành công",
+            admin,
+            code: true
         })
     } catch (error) {
         return res.status(400).json({

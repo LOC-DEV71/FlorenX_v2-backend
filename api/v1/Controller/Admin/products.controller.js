@@ -156,3 +156,61 @@ module.exports.changeMulti = async (req, res) => {
         })
     }
 }
+
+// [GET] /api/v1/admin/products/:slug
+module.exports.getProductBySlug = async (req, res) => {
+    try {
+        const {slug} = req.params;
+        const data = await Product.findOne({
+            slug: slug
+        })
+       
+        return res.status(200).json({
+            message: "Lấy thành công",
+            code: true,
+            data
+        })
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error}`,
+            code: false
+        })
+    }
+}
+// [POST] /api/v1/admin/products/update/:slug
+module.exports.update = async (req, res) => {
+    try {
+        const {slug} = req.params;
+        const data = req.body;
+
+        const exitProduct = await Product.findOne({slug: slug})
+
+        if(!exitProduct){
+            req.body.title = slugHelper(req.body.title)
+        }
+        
+       
+        if (req.body.specs) {
+            req.body.specs = JSON.parse(req.body.specs);
+        }
+
+        if(req.body.product_category_id){
+            req.body.product_category_id = req.body.product_category_id.toString();
+        }
+        
+        await Product.updateOne(
+            {slug: slug},
+            req.body
+        )
+        return res.status(200).json({
+            message: "Cập nhật thành công",
+            code: true,
+            data
+        })
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error}`,
+            code: false
+        })
+    }
+}

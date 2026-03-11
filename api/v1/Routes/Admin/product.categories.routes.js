@@ -1,9 +1,8 @@
 const express = require("express");
 const router = express.Router();
 
-const controller = require("../../Controller/Admin/accounts.controller");
-const validate = require("../../Validate/Admin/account.validate")
-const middleware = require("../../Middleware/Admin/permission.middleware")
+const controller = require("../../Controller/Admin/product.categories.controller");
+const validate = require("../../Validate/Admin/product.category.validate");
 
 const multer = require("multer");
 const upload = multer({
@@ -17,14 +16,15 @@ const upload = multer({
 const cloudinary = require("../../../../service/cloudinary.service");
 
 router.get("/", controller.index);
+router.get("/tree-categories", controller.getBulidTree);
+router.post("/change-multi", controller.changeMulti);
 
 router.post(
     "/create", 
-    validate.accountValidate,
-    middleware.permissionMiddleWare("create_accounts"),
     upload.fields([
     {name: "thumbnail", maxCount: 1 }
-    ]),
+    ]), 
+    validate.productCategoryValidate,
     cloudinary.streamUpload,
     controller.create
 );

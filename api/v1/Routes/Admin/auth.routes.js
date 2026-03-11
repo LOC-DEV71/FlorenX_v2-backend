@@ -9,6 +9,10 @@ router.post(
     validate.authValidate,
     controller.login
 )
+router.get(
+    "/get-admin", 
+    controller.getAdmin
+)
 router.post(
     "/logout", 
     controller.logout
