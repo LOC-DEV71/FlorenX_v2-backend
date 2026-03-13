@@ -23,7 +23,7 @@ router.post(
     validate.accountValidate,
     middleware.permissionMiddleWare("create_accounts"),
     upload.fields([
-    {name: "thumbnail", maxCount: 1 }
+    {name: "avatar", maxCount: 1 }
     ]),
     cloudinary.streamUpload,
     controller.create

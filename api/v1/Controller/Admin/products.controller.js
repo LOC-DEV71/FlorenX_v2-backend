@@ -4,62 +4,80 @@ const slugHelper = require("../../../../helper/slug.helper");
 // [GET] /api/v1/admin/products
 module.exports.index = async (req, res) => {
     try {
-
-        // sort && pagination
-        const sort = {}
         const find = {
             deleted: false
-        }
-        if (req.query.sort === "featured-yes") {
-            const [key, value] = req.query.sort.split("-");
-            find.featured = value
-        }
+        };
 
-        if (req.query.sort === "featured-no") {
-            const [key, value] = req.query.sort.split("-");
-            find.featured = value
-        }
+        const sort = {};
 
         if (req.query.sort) {
             const [key, value] = req.query.sort.split("-");
-            sort[key] = value === "asc" ? 1 : -1;
+
+            // filter featured
+            if (key === "featured") {
+                find.featured = value;
+            }
+
+            // sort
+            if (key === "position") {
+                sort.position = value === "asc" ? 1 : -1;
+            }
+
+            if (key === "price") {
+                sort.price = value === "asc" ? 1 : -1;
+                sort.position = 1; 
+            }
+
+            if (key === "title") {
+                sort.title = value === "asc" ? 1 : -1;
+                sort.position = 1; 
+            }
         }
 
-        //count products
-        const countProducts = await Product.find({deleted: false}).countDocuments();
+        if (Object.keys(sort).length === 0) {
+            sort.position = 1;
+        }
+
+        const countProducts = await Product.countDocuments({ deleted: false });
+
         const pagination = paginationHelper.pagination(countProducts, req.query, {});
 
+        const countProductsActive = await Product.countDocuments({
+            status: "active",
+            deleted: false
+        });
 
-        //count products active
-        const countProductsActive = await Product.find({status: "active", deleted: false}).countDocuments();
+        const countOutStock = await Product.countDocuments({
+            stock: 0,
+            deleted: false
+        });
 
-        //count out of stock
-        const countOutStock = await Product.find({stock: 0, deleted: false}).countDocuments();
+        const countLowStock = await Product.countDocuments({
+            stock: { $lte: 10 },
+            deleted: false
+        });
 
-        //count out of stock
-        const countLowStock = await Product.find({stock: { $lte: 10 }, deleted: false}).countDocuments();
-
-        const products = await Product
-            .find(find)
+        const products = await Product.find(find)
             .sort(sort)
             .skip(pagination.skip)
             .limit(pagination.limit);
 
-
         return res.status(200).json({
+            code: true,
             products,
             pagination,
             totalProduct: countProducts,
             productsActive: countProductsActive,
             countOutStock,
             countLowStock
-        })
+        });
     } catch (error) {
         return res.status(400).json({
-            message: `Lỗi: ${error}`
-        })
+            code: false,
+            message: `Lỗi: ${error.message}`
+        });
     }
-}
+};
 
 // [POST] /api/v1/admin/products/create
 module.exports.create = async (req, res) => {
@@ -81,7 +99,7 @@ module.exports.create = async (req, res) => {
         if (req.body.position) {
             req.body.position = Number(req.body.position);
         } else {
-            const countDocuments = await Product.countDocuments();
+            const countDocuments = await Product.countDocuments({deleted: false});
             req.body.position = countDocuments + 1;
         }
 
@@ -162,7 +180,8 @@ module.exports.getProductBySlug = async (req, res) => {
     try {
         const {slug} = req.params;
         const data = await Product.findOne({
-            slug: slug
+            slug: slug,
+            deleted: false
         })
        
         return res.status(200).json({
@@ -183,7 +202,7 @@ module.exports.update = async (req, res) => {
         const {slug} = req.params;
         const data = req.body;
 
-        const exitProduct = await Product.findOne({slug: slug})
+        const exitProduct = await Product.findOne({slug: slug, deleted: false})
 
         if(!exitProduct){
             req.body.title = slugHelper(req.body.title)

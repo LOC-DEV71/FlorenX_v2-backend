@@ -6,7 +6,8 @@ module.exports.login = async (req, res) => {
     try {
         const {email, password} = req.body;
         const exitEmail = await Account.findOne({
-            email
+            email,
+            deleted: false
         }).lean();
         if(!exitEmail){
             return res.status(400).json({
@@ -65,7 +66,8 @@ module.exports.getAdmin = async (req, res) => {
         const dedcode = jwtUtils.verifyToken(token);
         
         const admin = await Account.findOne({
-            _id: dedcode.id
+            _id: dedcode.id,
+            deleted: false
         }).select("-password -_id")
         
         return res.status(200).json({

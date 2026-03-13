@@ -3,7 +3,8 @@ const bulidTree = require("../../../../helper/buildTree.helper");
 const paginationHelper = require("../../../../helper/pagination.helper");
 module.exports.index = async (req, res) => {
      try {
-        const sort = {}
+        const sort = {
+        }
         const find = {
             deleted: false
         }
@@ -34,17 +35,22 @@ module.exports.index = async (req, res) => {
             const [key, value] = req.query.sort.split("-");
             sort[key] = value ? 1 : -1;
         }
+
+        if(Object.keys(sort).length === 0){
+            sort.position = 1;
+        }
         const productCategories = await ProductCategories.find(find).sort(sort)
         const categories = bulidTree.buildTree(productCategories, "");
 
         //status active
-        const activeCategories = await ProductCategories.find({status: "active"}).countDocuments();
+        const activeCategories = await ProductCategories.find({status: "active", deleted: false}).countDocuments();
         //total
-        const totalCategories = await ProductCategories.countDocuments();
+        const totalCategories = await ProductCategories.find({deleted: false}).countDocuments();
         //total parent 
-        const parentCategories = await ProductCategories.find({parent_id: null}).countDocuments();
+        const parentCategories = await ProductCategories.find({parent_id: null, deleted: false}).countDocuments();
         //total children
         const childCategories = totalCategories - parentCategories;
+
 
         return res.status(200).json({
             code: true,
@@ -61,6 +67,39 @@ module.exports.index = async (req, res) => {
         })
     }
 }
+module.exports.getListCategory = async (req, res) => {
+     try {
+        const productCategories = await ProductCategories.find({deleted: false})
+        const categories = bulidTree.buildTree(productCategories, "");
+
+        return res.status(200).json({
+            code: true,
+            categories
+        })
+    } catch (error) {
+        return res.status(400).json({
+            code: false,
+            message: `Lỗi: ${error}`
+        })
+    }
+}
+
+module.exports.getCategoryBySlug = async (req, res) => {
+     try {
+        const productCategory = await ProductCategories.findOne({deleted: false, slug: req.params.slug}).lean();
+
+        return res.status(200).json({
+            code: true,
+            category: productCategory
+        })
+    } catch (error) {
+        return res.status(400).json({
+            code: false,
+            message: `Lỗi: ${error}`
+        })
+    }
+}
+
 module.exports.create = async (req, res) => {
     try { 
         const createCategory = new ProductCategories(req.body);
@@ -77,6 +116,26 @@ module.exports.create = async (req, res) => {
         })
     }
 }
+module.exports.update = async (req, res) => {
+  try {
+    const { _id, slug } = req.body;
+
+    await ProductCategories.updateOne(
+      { _id: _id },
+      req.body
+    );
+
+    return res.status(200).json({
+      code: true,
+      message: "Cập nhật thành công"
+    });
+  } catch (error) {
+    return res.status(400).json({
+      code: false,
+      message: `Lỗi: ${error.message}`
+    });
+  }
+};
 
 module.exports.getBulidTree = async (req, res) => {
     try {

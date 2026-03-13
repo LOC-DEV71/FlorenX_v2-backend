@@ -16,6 +16,8 @@ const upload = multer({
 const cloudinary = require("../../../../service/cloudinary.service");
 
 router.get("/", controller.index);
+router.get("/detail/:slug", controller.getCategoryBySlug);
+router.get("/get-list", controller.getListCategory);
 router.get("/tree-categories", controller.getBulidTree);
 router.post("/change-multi", controller.changeMulti);
 
@@ -27,6 +29,16 @@ router.post(
     validate.productCategoryValidate,
     cloudinary.streamUpload,
     controller.create
+);
+
+router.post(
+    "/update", 
+    upload.fields([
+    {name: "thumbnail", maxCount: 1 }
+    ]), 
+    validate.updateProductCategoryValidate,
+    cloudinary.streamUpload,
+    controller.update
 );
 
 module.exports = router;
