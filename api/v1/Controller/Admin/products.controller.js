@@ -1,6 +1,7 @@
 const Product = require("../../Models/products.models");
 const paginationHelper = require("../../../../helper/pagination.helper");
 const slugHelper = require("../../../../helper/slug.helper");
+const getAllProductsHelper = require("../../../../helper/getAllProductInCategoryParentId");
 // [GET] /api/v1/admin/products
 module.exports.index = async (req, res) => {
     try {
@@ -10,9 +11,17 @@ module.exports.index = async (req, res) => {
 
         const sort = {};
 
+        if (req.query.sortByCategory) {
+            const childrenCategoryIds = await getAllProductsHelper.getChildrenCategories(req.query.sortByCategory);
+
+            find.product_category_id = {
+                $in: [req.query.sortByCategory, ...childrenCategoryIds]
+            };
+        }
+
         if (req.query.sort) {
             const [key, value] = req.query.sort.split("-");
-
+        
             // filter featured
             if (key === "featured") {
                 find.featured = value;

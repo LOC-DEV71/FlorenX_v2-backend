@@ -10,6 +10,7 @@ const permissonSchema = new mongoose.Schema({
       required: true,
       unique: true
     },
+    description: String,
     permissions: [
       {
         label: {

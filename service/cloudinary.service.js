@@ -42,3 +42,17 @@ module.exports.streamUpload = async (req, res, next) => {
     });
   }
 };
+module.exports.streamUploadAvatar = async (req, res, next) => {
+  try {
+    if (req.files?.avatar?.length) {
+      const result = await uploadStream(req.files.avatar[0]);
+      req.body.avatar = result.secure_url;
+    }
+
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      message: "Upload image failed"
+    });
+  }
+};

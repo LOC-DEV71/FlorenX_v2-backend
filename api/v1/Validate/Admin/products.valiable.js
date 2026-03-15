@@ -15,11 +15,11 @@ module.exports.productValidate = async (req, res, next) => {
                 code: false
             })
         }
-        // if(!req.body.product_category_id){
-        //     return res.status(400).json({
-        //         message: "Vui lòng chọn danh mục sản phẩm"
-        //     })
-        // }
+        if(!req.body.product_category_id){
+            return res.status(400).json({
+                message: "Vui lòng chọn danh mục sản phẩm"
+            })
+        }
         if(req.body.price <= 0){
             return res.status(400).json({
                 message: "Vui lòng nhập giá",
