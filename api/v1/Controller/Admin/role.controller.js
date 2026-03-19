@@ -2,7 +2,6 @@ const Role = require("../../Models/roles.model");
 const slugHelper = require("../../../../helper/slug.helper");
 module.exports.index = async (req, res) => {
     try {
-        console.log(req.query)
         const find = {}
         const sort = {}
 

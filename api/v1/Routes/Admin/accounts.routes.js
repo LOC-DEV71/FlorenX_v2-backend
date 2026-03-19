@@ -16,12 +16,23 @@ const upload = multer({
 
 const cloudinary = require("../../../../service/cloudinary.service");
 
-router.get("/", controller.index);
-router.get("/:id", controller.getAccountById);
-router.post("/change-multi", controller.changeMulti);
+router.get(
+    "/", 
+    middleware.permissionMiddleWare("view_accounts"),
+    controller.index
+);
+router.get("/:id", 
+    middleware.permissionMiddleWare("view_accounts"),
+    controller.getAccountById
+);
+router.post(
+    "/change-multi", 
+    middleware.permissionMiddleWare("update_accounts"),
+    controller.changeMulti
+);
 router.post(
     "/create", 
-    // middleware.permissionMiddleWare("create_accounts"),
+    middleware.permissionMiddleWare("create_accounts"),
     upload.fields([
     {name: "avatar", maxCount: 1 }
     ]),
@@ -31,8 +42,7 @@ router.post(
 );
 router.post(
     "/update/:id", 
-    // middleware.permissionMiddleWare("create_accounts"),
-    
+    middleware.permissionMiddleWare("update_accounts"),
     upload.fields([
         {name: "avatar", maxCount: 1 }
     ]),

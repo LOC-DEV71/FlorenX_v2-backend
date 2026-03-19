@@ -3,6 +3,7 @@ const router = express.Router();
 
 const controller = require("../../Controller/Admin/product.categories.controller");
 const validate = require("../../Validate/Admin/product.category.validate");
+const middleware = require("../../Middleware/Admin/permission.middleware");
 
 const multer = require("multer");
 const upload = multer({
@@ -15,14 +16,39 @@ const upload = multer({
 
 const cloudinary = require("../../../../service/cloudinary.service");
 
-router.get("/", controller.index);
-router.get("/detail/:slug", controller.getCategoryBySlug);
-router.get("/get-list", controller.getListCategory);
-router.get("/tree-categories", controller.getBulidTree);
-router.post("/change-multi", controller.changeMulti);
+router.get(
+    "/", 
+    middleware.permissionMiddleWare("view_product_category"),
+    controller.index
+);
+router.get(
+    "/detail/:slug", 
+    middleware.permissionMiddleWare("view_product_category"),
+    controller.getCategoryBySlug
+);
+
+router.get(
+    "/get-list", 
+    middleware.permissionMiddleWare("view_product_category"),
+    controller.getListCategory
+);
+
+router.get(
+    "/tree-categories", 
+    middleware.permissionMiddleWare("view_product_category"),
+    controller.getBulidTree
+);
+
+
+router.post(
+    "/change-multi", 
+    middleware.permissionMiddleWare("update_product_category"),
+    controller.changeMulti
+);
 
 router.post(
     "/create", 
+    middleware.permissionMiddleWare("create_product_category"),
     upload.fields([
     {name: "thumbnail", maxCount: 1 }
     ]), 
@@ -33,6 +59,7 @@ router.post(
 
 router.post(
     "/update", 
+    middleware.permissionMiddleWare("update_product_category"),
     upload.fields([
     {name: "thumbnail", maxCount: 1 }
     ]), 

@@ -1,4 +1,5 @@
 const Account = require("../../Models/accounts.model");
+const Roles = require("../../Models/roles.model");
 const bcrypt = require("bcryptjs");
 const jwtUtils = require("../../../../utils/jwt.utils");
 
@@ -69,10 +70,15 @@ module.exports.getAdmin = async (req, res) => {
             _id: dedcode.id,
             deleted: false
         }).select("-password -_id")
+
+        const role = await Roles.findOne({
+            slug: admin?.role_slug
+        })
         
         return res.status(200).json({
             message: "Lấy thành công",
             admin,
+            role,
             code: true
         })
     } catch (error) {

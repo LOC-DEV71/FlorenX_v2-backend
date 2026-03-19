@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 const controller = require("../../Controller/Admin/products.controller");
-const validate = require("../../Validate/Admin/products.valiable")
+const validate = require("../../Validate/Admin/products.valiable");
+const middleware = require("../../Middleware/Admin/permission.middleware");
 
 const multer = require("multer");
 const upload = multer({
@@ -15,12 +16,26 @@ const upload = multer({
 
 const cloudinary = require("../../../../service/cloudinary.service");
 
-router.get("/", controller.index);
-router.get("/:slug", controller.getProductBySlug);
-router.post("/change-multi", controller.changeMulti);
+router.get(
+    "/", 
+    middleware.permissionMiddleWare("view_products"),
+    controller.index
+);
+router.get(
+    "/:slug", 
+    middleware.permissionMiddleWare("view_products"),
+    controller.getProductBySlug
+);
+
+router.post(
+    "/change-multi", 
+    middleware.permissionMiddleWare("update_products"),
+    controller.changeMulti
+);
+
 router.post(
     "/create",
-    
+    middleware.permissionMiddleWare("create_products"),
     upload.fields([
         { name: "thumbnail", maxCount: 1 },
         { name: "images", maxCount: 10 }
@@ -32,6 +47,7 @@ router.post(
 
 router.post(
     "/update/:slug",
+    middleware.permissionMiddleWare("update_products"),
     upload.fields([
         { name: "thumbnail", maxCount: 1 },
         { name: "images", maxCount: 10 }

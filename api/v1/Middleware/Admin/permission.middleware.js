@@ -7,7 +7,8 @@ module.exports.permissionMiddleWare =  (permission) =>{
             const token = req.cookies.token;
             if(!token){
                 return res.status(401).json({
-                    message: "Bạn chưa đăng nhập"
+                    message: "Bạn chưa đăng nhập",
+                    code: false
                 })
             }
             const {id, role} = jwtUtils.verifyToken(token);
@@ -17,7 +18,8 @@ module.exports.permissionMiddleWare =  (permission) =>{
             }).lean().select("role_slug");
             if(!exitAccount){
                 return res.status(400).json({
-                    message: "Tài khoản admin không tồn tại"
+                    message: "Tài khoản admin không tồn tại",
+                    code: false
                 })
             }
             const exitRole = await Role.findOne({
@@ -26,13 +28,15 @@ module.exports.permissionMiddleWare =  (permission) =>{
             
             if(!exitRole){
                 return res.status(400).json({
-                    message: "Nhóm quyền không tồn tại"
+                    message: "Nhóm quyền không tồn tại",
+                    code: false
                 })
             }
 
-            if(!exitRole?.permission.includes(permission)){
+            if(!exitRole?.permissions?.includes(permission)){
                  return res.status(400).json({
-                    message: "Bạn không có quyền thực hiện hành động này"
+                    message: "Bạn không có quyền thực hiện hành động này",
+                    code: false
                 })
             }
 
