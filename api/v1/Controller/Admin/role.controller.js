@@ -1,39 +1,52 @@
 const Role = require("../../Models/roles.model");
-const slugHelper = require("../../../../helper/slug.helper");
 module.exports.index = async (req, res) => {
     try {
-        const find = {}
-        const sort = {}
+        const find = {
+            deleted: false
+        };
+        const sort = {};
 
-        if(req.query.sort){
+        if (req.query.sort) {
             const [key, value] = req.query.sort.split("-");
-           if (key === "title") {
+
+            if (key === "title") {
                 sort.title = value === "asc" ? 1 : -1;
             }
-           if (key === "slug") {
+
+            if (key === "slug") {
                 sort.slug = value === "asc" ? 1 : -1;
             }
         }
-        const roles = await Role.find(find).sort(sort)
+
+        const roles = await Role.find(find).sort(sort);
+
+        const summary = {
+            totalRoles: roles.length,
+            activeRoles: roles.filter(item => item.status === "active").length,
+            inactiveRoles: roles.filter(item => item.status === "inactive").length,
+            systemRoles: roles.filter(item => item.isSystem === true).length,
+        };
 
         return res.status(200).json({
             code: true,
-            roles
-        })
+            roles,
+            summary
+        });
     } catch (error) {
         return res.status(400).json({
             message: `Lỗi: ${error}`,
             code: false
-        })
+        });
     }
-}
+};
 
 module.exports.getRoleBySlug = async (req, res) => {
     try {
         const {slug} = req.params;
 
         const role = await Role.findOne({
-            slug: slug
+            slug: slug,
+            deleted: false
         }).lean();
 
         return res.status(200).json({
@@ -90,8 +103,9 @@ module.exports.changeMulti = async (req, res) => {
 
        switch (typeChange) {
         case "delete":
-            await Role.deleteMany(
-                {_id: {$in: selectId}}
+            await Role.updateMany(
+                {_id: {$in: selectId}},
+                {deleted: true}
             )
             return res.status(200).json({
                 message: "Đã thay đổi trạng thái thành công",

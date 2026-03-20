@@ -9,7 +9,8 @@ const productCategoriesRoutes = require("./product.categories.routes");
 const permissionRoutes = require("./permission.routes.js")
 const newsCategoryRoutes = require("./news.category.routes.js")
 const newsRoutes = require("./news.routes.js")
-
+const trashCanRoutes = require("./trashcan.routes.js")
+const settingsRoutes = require("./settings.routes.js")
 
 router.use("/products", productRoutes);
 router.use("/product-categories", productCategoriesRoutes);
@@ -19,5 +20,7 @@ router.use("/auth-admin", authRoutes);
 router.use("/permission", permissionRoutes);
 router.use("/news-category", newsCategoryRoutes);
 router.use("/news", newsRoutes);
+router.use("/trashcan", trashCanRoutes);
+router.use("/settings", settingsRoutes);
 
 module.exports = router;

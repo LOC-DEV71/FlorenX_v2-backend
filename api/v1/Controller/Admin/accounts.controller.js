@@ -58,7 +58,8 @@ module.exports.create = async (req, res) => {
         const { email, password } = req.body;
 
         const exitEmail = await Account.findOne({
-            email: email
+            email: email,
+            deleted: false
         })
 
         if (exitEmail) {
@@ -91,7 +92,7 @@ module.exports.update = async (req, res) => {
         const { id } = req.params;
         const { email, password, ...rest } = req.body;
 
-        const existEmail = await Account.findOne({ email });
+        const existEmail = await Account.findOne({ email: email, deleted: false });
 
         if (existEmail && existEmail._id.toString() !== id) {
             return res.status(400).json({
@@ -127,6 +128,7 @@ module.exports.update = async (req, res) => {
 module.exports.changeMulti = async (req, res) => {
     try {
         const { selectId, typeChange } = req.body;
+        console.log(req.body)
         switch (typeChange) {
             case "active":
                 await Account.updateMany(

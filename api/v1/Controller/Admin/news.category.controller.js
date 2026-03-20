@@ -4,7 +4,9 @@ const paginationHelper = require("../../../../helper/pagination.helper");
 // [GET] /api/v1/admin/news-category
 module.exports.index = async (req, res) => {
   try {
-    const find = {};
+    const find = {
+      deleted: false
+    };
     const sort = {};
 
     // filter status
@@ -113,9 +115,11 @@ module.exports.changeMulti = async (req, res) => {
     }
 
     if (typeChange === "delete") {
-      await NewsCategory.deleteMany({
-        _id: { $in: selectId }
-      });
+      await NewsCategory.updateMany({
+        _id: { $in: selectId },
+      },
+        {deleted: true}
+      );
 
       return res.status(200).json({
         code: true,
@@ -138,7 +142,8 @@ module.exports.getBySlug = async (req, res) => {
     try {
         const {slug} = req.params;
        const newsCategory = await NewsCategory.findOne({
-        slug: slug
+        slug: slug,
+        deleted: false
        })
         return res.status(200).json({
             code: true, newsCategory
