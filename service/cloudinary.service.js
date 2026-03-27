@@ -77,8 +77,31 @@ module.exports.streamUploadSetting = async (req, res, next) => {
       req.body.bannerMobile = result.secure_url;
     }
 
+    // upload section hero images
+    if (req.files?.sectionHeroImages?.length) {
+      const results = await Promise.all(
+        req.files.sectionHeroImages.map((file) => uploadStream(file))
+      );
+      req.body.sectionHeroUploadedLinks = results.map((item) => item.secure_url);
+    } else {
+      req.body.sectionHeroUploadedLinks = [];
+    }
+
+    // upload section hero slider images
+    if (req.files?.sectionHeroSliderImages?.length) {
+      const results = await Promise.all(
+        req.files.sectionHeroSliderImages.map((file) => uploadStream(file))
+      );
+      req.body.sectionHeroSliderUploadedLinks = results.map(
+        (item) => item.secure_url
+      );
+    } else {
+      req.body.sectionHeroSliderUploadedLinks = [];
+    }
+
     next();
   } catch (error) {
+    console.log("streamUploadSetting error:", error);
     return res.status(500).json({
       message: "Upload image failed"
     });

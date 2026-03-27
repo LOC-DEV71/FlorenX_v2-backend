@@ -21,7 +21,7 @@ const newsSchema = new mongoose.Schema(
       type: String,
       default: ""
     },
-    category_id:String,
+    slug_category: String,
     status: {
       type: String,
       enum: ["draft", "published", "hidden"],

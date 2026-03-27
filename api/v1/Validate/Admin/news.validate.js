@@ -20,7 +20,7 @@ module.exports.newsValidate = async (req, res, next) => {
             })
         }
 
-        if(!req.body.category_id){
+        if(!req.body.slug_category){
             return res.status(400).json({
                 message: "Vui lòng chọn danh mục bài viết",
                 code: false

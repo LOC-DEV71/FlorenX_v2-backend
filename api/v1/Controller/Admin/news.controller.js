@@ -100,12 +100,9 @@ module.exports.index = async (req, res) => {
 // [POST] /api/v1/admin/news/create
 module.exports.create = async (req, res) => {
   try {
+    console.log(req.body)
     if (req.body.title) {
       req.body.slug = slugHelper(req.body.title);
-    }
-
-    if (req.body.featured !== undefined) {
-      req.body.featured = req.body.featured === "true" || req.body.featured === true;
     }
 
     const createNews = new News(req.body);
