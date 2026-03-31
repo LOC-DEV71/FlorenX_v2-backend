@@ -1,11 +1,11 @@
 const Product = require("../../Models/products.models");
 const Category = require("../../Models/products.category");
 const getChildrenCategories = require("../../../../helper/getAllProductInCategoryParentId");
-
+const paginationHelper = require("../../../../helper/pagination.helper");
 module.exports.getProductByCategory = async (req, res) => {
     try {
         const { category } = req.params;
-        
+
         const productCategory = await Category.findOne({
             slug: category,
             deleted: false
@@ -19,13 +19,14 @@ module.exports.getProductByCategory = async (req, res) => {
             });
         }
 
+
         const product_category_id = productCategory._id.toString();
         const childIds = await getChildrenCategories.getChildrenCategories(product_category_id)
         const categortIds = [product_category_id, ...childIds];
 
         const find = {
             deleted: false,
-            product_category_id: {$in: categortIds}
+            product_category_id: { $in: categortIds }
         }
 
         switch (req.query.price) {
@@ -41,7 +42,7 @@ module.exports.getProductByCategory = async (req, res) => {
             case "15000000":
                 find.price = { $lt: 15000000 };
                 break;
-        
+
             default:
                 break;
         }
@@ -50,12 +51,48 @@ module.exports.getProductByCategory = async (req, res) => {
             find.discountPercentage = { $gt: 0, $type: "number" };
         }
 
-        const products = (await Product.find(find));
+        const countProducts = await Product.find(find).countDocuments();
+        const pagination = paginationHelper.pagination(countProducts, req.query);
 
-        
+
+        const products = await Product.find(find).limit(pagination.limit).skip(pagination.skip)
+
+
         return res.status(200).json({
             code: true,
             products,
+            pagination
+        });
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error.message}`,
+            code: false
+        });
+    }
+};
+module.exports.getProductBySlug = async (req, res) => {
+    try {
+        const { slug } = req.params;
+
+        const product = await Product.findOne({
+            deleted: false,
+            slug: slug
+        })
+
+        const category = await Category.findOne({
+            _id: product.product_category_id
+        })
+        
+        const productList = await Product.find({
+            deleted: false,
+            product_category_id: category._id
+        })
+
+        const products = productList.filter(item => item._id.toString() !== product._id.toString());
+        return res.status(200).json({
+            code: true,
+            product,
+            products
         });
     } catch (error) {
         return res.status(400).json({
