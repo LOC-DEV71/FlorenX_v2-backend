@@ -2,6 +2,9 @@ const Product = require("../../Models/products.models");
 const Category = require("../../Models/products.category");
 const getChildrenCategories = require("../../../../helper/getAllProductInCategoryParentId");
 const paginationHelper = require("../../../../helper/pagination.helper");
+const Likes = require("../../Models/likes.model");
+const Users = require("../../Models/user.models");
+const jwtUtils = require("../../../../utils/jwt.utils")
 module.exports.getProductByCategory = async (req, res) => {
     try {
         const { category } = req.params;
@@ -26,7 +29,8 @@ module.exports.getProductByCategory = async (req, res) => {
 
         const find = {
             deleted: false,
-            product_category_id: { $in: categortIds }
+            product_category_id: { $in: categortIds },
+            status: "active"
         }
 
         switch (req.query.price) {
@@ -58,6 +62,7 @@ module.exports.getProductByCategory = async (req, res) => {
         const products = await Product.find(find).limit(pagination.limit).skip(pagination.skip)
 
 
+
         return res.status(200).json({
             code: true,
             products,
@@ -76,7 +81,8 @@ module.exports.getProductBySlug = async (req, res) => {
 
         const product = await Product.findOne({
             deleted: false,
-            slug: slug
+            slug: slug,
+            status: "active"
         })
 
         const category = await Category.findOne({
@@ -85,7 +91,8 @@ module.exports.getProductBySlug = async (req, res) => {
         
         const productList = await Product.find({
             deleted: false,
-            product_category_id: category._id
+            product_category_id: category._id,
+            status: "active"
         })
 
         const products = productList.filter(item => item._id.toString() !== product._id.toString());
