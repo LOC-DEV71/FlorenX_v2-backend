@@ -2,9 +2,9 @@ const Product = require("../../Models/products.models");
 const Category = require("../../Models/products.category");
 const getChildrenCategories = require("../../../../helper/getAllProductInCategoryParentId");
 const paginationHelper = require("../../../../helper/pagination.helper");
-const Likes = require("../../Models/likes.model");
-const Users = require("../../Models/user.models");
-const jwtUtils = require("../../../../utils/jwt.utils")
+// const Likes = require("../../Models/likes.model");
+// const Users = require("../../Models/user.models");
+// const jwtUtils = require("../../../../utils/jwt.utils")
 module.exports.getProductByCategory = async (req, res) => {
     try {
         const { category } = req.params;
@@ -59,7 +59,7 @@ module.exports.getProductByCategory = async (req, res) => {
         const pagination = paginationHelper.pagination(countProducts, req.query);
 
 
-        const products = await Product.find(find).limit(pagination.limit).skip(pagination.skip)
+        const products = await Product.find(find).sort({position: -1}).limit(pagination.limit).skip(pagination.skip)
 
 
 
@@ -99,6 +99,33 @@ module.exports.getProductBySlug = async (req, res) => {
         return res.status(200).json({
             code: true,
             product,
+            products
+        });
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error.message}`,
+            code: false
+        });
+    }
+};
+module.exports.getProductBySale = async (req, res) => {
+    try {
+        const slug = req.params.category;
+        const parentId = await Category.findOne({slug: slug});
+        const childIds = await getChildrenCategories.getChildrenCategories(parentId)
+       
+        const childListId = [parentId._id,...childIds];
+
+        const find = {
+            deleted: false,
+            product_category_id: { $in: childListId },
+            status: "active",
+            discountPercentage: { $gt: 0 } // chỉ lấy sản phẩm có giảm giá
+        }
+
+        const products = await Product.find(find).sort({position: -1}).limit(4);
+        return res.status(200).json({
+            code: true,
             products
         });
     } catch (error) {

@@ -2,32 +2,70 @@ const mongoose = require("mongoose");
 
 const productSchema = new mongoose.Schema(
   {
-    title: String,
+    title: {
+      type: String,
+      trim: true,
+      required: true
+    },
+
+    sku: {
+      type: String,
+      unique: true,
+      index: true,
+      trim: true
+    },
 
     product_category_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ProductCategory"
     },
 
-    description: String,
+    description: {
+      type: String,
+      default: ""
+    },
 
-    price: Number,
+    price: {
+      type: Number,
+      default: 0
+    },
 
     discountPercentage: {
       type: Number,
       default: 0
     },
 
-    stock: Number,
+    base_unit: {
+      type: String,
+      default: "cai",
+      trim: true
+    },
 
-    thumbnail: String,
+    low_stock_threshold: {
+      type: Number,
+      default: 5
+    },
+
+    is_combo: {
+      type: Boolean,
+      default: false
+    },
+
+    thumbnail: {
+      type: String,
+      default: ""
+    },
 
     images: {
       type: [String],
       default: []
     },
 
-    brand: String,
+    brand: {
+      type: String,
+      default: "",
+      trim: true
+    },
 
     status: {
       type: String,
@@ -49,7 +87,8 @@ const productSchema = new mongoose.Schema(
     slug: {
       type: String,
       unique: true,
-      index: true
+      index: true,
+      trim: true
     },
 
     specs: {
@@ -92,7 +131,6 @@ const productSchema = new mongoose.Schema(
         updatedAt: Date
       }
     ]
-
   },
   { timestamps: true }
 );

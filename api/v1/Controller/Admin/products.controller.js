@@ -44,7 +44,7 @@ module.exports.index = async (req, res) => {
         }
 
         if (Object.keys(sort).length === 0) {
-            sort.position = 1;
+            sort.position = -1;
         }
 
         const countProducts = await Product.countDocuments({ deleted: false });
@@ -91,7 +91,7 @@ module.exports.index = async (req, res) => {
 // [POST] /api/v1/admin/products/create
 module.exports.create = async (req, res) => {
     try {
-        
+        console.log(req.body.specs)
         if(req.body.title){
             req.body.slug = slugHelper(req.body.title)
         }
@@ -99,6 +99,7 @@ module.exports.create = async (req, res) => {
         if (req.body.specs) {
             req.body.specs = JSON.parse(req.body.specs);
         }
+
 
         if (req.body.discountPercentage) {
             req.body.discountPercentage = Number(req.body.discountPercentage);
@@ -112,8 +113,8 @@ module.exports.create = async (req, res) => {
             req.body.position = countDocuments + 1;
         }
 
-        const createProduct = new Product(req.body);
-        await createProduct.save();
+        // const createProduct = new Product(req.body);
+        // await createProduct.save();
 
         return res.status(200).json({
             message: "Thêm sản phẩm thành công",
