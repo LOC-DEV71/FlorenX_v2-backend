@@ -11,6 +11,9 @@ const newsCategoryRoutes = require("./news.category.routes.js")
 const newsRoutes = require("./news.routes.js")
 const trashCanRoutes = require("./trashcan.routes.js")
 const settingsRoutes = require("./settings.routes.js")
+const inventoryRoutes = require("./inventoryRoutes.routes.js")
+const warehouseRoutes = require("./warehouse.routes.js")
+const inventoryAuditRoutes = require("./inventory.audit.routes.js")
 
 router.use("/products", productRoutes);
 router.use("/product-categories", productCategoriesRoutes);
@@ -22,5 +25,8 @@ router.use("/news-category", newsCategoryRoutes);
 router.use("/news", newsRoutes);
 router.use("/trashcan", trashCanRoutes);
 router.use("/settings", settingsRoutes);
+router.use("/inventory", inventoryRoutes);
+router.use("/warehouse", warehouseRoutes);
+router.use("/inventory-audit", inventoryAuditRoutes);
 
 module.exports = router;

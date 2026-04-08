@@ -8,13 +8,6 @@ const productSchema = new mongoose.Schema(
       required: true
     },
 
-    sku: {
-      type: String,
-      unique: true,
-      index: true,
-      trim: true
-    },
-
     product_category_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ProductCategory"

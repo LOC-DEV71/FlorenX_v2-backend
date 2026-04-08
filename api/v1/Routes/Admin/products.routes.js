@@ -22,6 +22,16 @@ router.get(
     controller.index
 );
 router.get(
+    "/get-list", 
+    middleware.permissionMiddleWare("view_products"),
+    controller.getListProducts
+);
+router.get(
+    "/get-list-no-query", 
+    middleware.permissionMiddleWare("view_products"),
+    controller.getListProductNoQuery
+);
+router.get(
     "/:slug", 
     middleware.permissionMiddleWare("view_products"),
     controller.getProductBySlug
