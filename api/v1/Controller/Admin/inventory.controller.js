@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 const Warehouse = require("../../Models/warehouse.models");
 const InventoryTransaction = require("../../Models/InventoryTransaction.models");
 const ProductStock = require("../../Models/product-stock.models");
-
+const Pagination = require("../../../../helper/pagination.helper");
 module.exports.inventoryImport = async (req, res) => {
     const session = await mongoose.startSession();
 
@@ -40,6 +40,7 @@ module.exports.inventoryImport = async (req, res) => {
             }
 
             const qty = Number(quantity) || 0;
+            const price = Number(importPrice) || 0;
 
             let stock = await ProductStock.findOne({
                 product_id: productId,
@@ -69,6 +70,7 @@ module.exports.inventoryImport = async (req, res) => {
                         product_id: productId,
                         warehouse_id: warehouse,
                         quantity: qty,
+                        import_price: price,
                         ref_id: code,
                     },
                 ],
@@ -91,4 +93,86 @@ module.exports.inventoryImport = async (req, res) => {
     } finally {
         session.endSession();
     }
+};
+module.exports.getListInventoryImport = async (req, res) => {
+  try {
+    const countInventory = await InventoryTransaction.countDocuments({
+      type: "import"
+    });
+
+    const pagination = Pagination.pagination(countInventory, req.query);
+
+    const data = await InventoryTransaction.aggregate([
+      {
+        $match: { type: "import" }
+      },
+      {
+        $sort: { createdAt: -1 }
+      },
+      {
+        $skip: pagination.skip
+      },
+      {
+        $limit: pagination.limit
+      },
+
+      // join Product
+      {
+        $lookup: {
+          from: "products",
+          localField: "product_id",
+          foreignField: "_id",
+          as: "product"
+        }
+      },
+      {
+        $unwind: {
+          path: "$product",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      // join Warehouse
+      {
+        $lookup: {
+          from: "warehouses",
+          localField: "warehouse_id",
+          foreignField: "_id",
+          as: "warehouse"
+        }
+      },
+      {
+        $unwind: {
+          path: "$warehouse",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+      {
+        $project: {
+          _id: 1,
+          quantity: 1,
+          ref_id: 1,
+          createdAt: 1,
+          import_price: 1,
+          "product.title": 1,
+          "product.slug": 1,
+          "product.thumbnail": 1,
+          "warehouse.name": 1
+        }
+      }
+    ]);
+
+    return res.status(200).json({
+      code: true,
+      message: "Lấy danh sách nhập kho thành công",
+      data,
+      pagination
+    });
+  } catch (error) {
+    return res.status(500).json({
+      code: false,
+      message: `Lỗi: ${error.message}`,
+    });
+  }
 };

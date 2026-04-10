@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+
 const transactionSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -17,8 +18,12 @@ const transactionSchema = new mongoose.Schema({
 
   quantity: Number, // + hoặc -
 
-  ref_id: String, // id của phiếu (import/export/order...)
+  import_price: {
+    type: Number,
+    default: 0
+  },
 
+  ref_id: String, // id của phiếu (import/export/order...)
 }, { timestamps: true });
 
 module.exports = mongoose.model("InventoryTransaction", transactionSchema);
