@@ -1,6 +1,6 @@
 const ProductCategories = require("../../Models/products.category");
+const Products = require("../../Models/products.models");
 const bulidTree = require("../../../../helper/buildTree.helper");
-const paginationHelper = require("../../../../helper/pagination.helper");
 module.exports.index = async (req, res) => {
      try {
         const sort = {
@@ -192,7 +192,16 @@ module.exports.changeMulti = async (req, res) => {
                     code: true
                 });
             case "delete":
-                await Product.updateMany(
+                const product = await Products.find(
+                    {product_category_id: {$in: selectId}}
+                )
+                if(product){
+                    return res.status(400).json({
+                    message: "Danh mục đang chứa sản phẩm, yêu cầu thất bại",
+                    code: false
+                })
+                }
+                await ProductCategories.updateMany(
                     { _id: { $in: selectId } },
                     {deleted: true}
                 )

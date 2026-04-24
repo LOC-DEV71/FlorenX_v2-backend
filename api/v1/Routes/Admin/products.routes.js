@@ -31,6 +31,13 @@ router.get(
     middleware.permissionMiddleWare("view_products"),
     controller.getListProductNoQuery
 );
+
+router.get(
+    "/get-list-export", 
+    middleware.permissionMiddleWare("view_products"),
+    controller.getListExport
+);
+
 router.get(
     "/:slug", 
     middleware.permissionMiddleWare("view_products"),

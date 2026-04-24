@@ -23,6 +23,13 @@ const transactionSchema = new mongoose.Schema({
     default: 0
   },
 
+  ref_name: {
+    type: String,
+    trim: true
+  }, // tên đơn / tên phiếu
+
+  note: String ,
+
   ref_id: String, // id của phiếu (import/export/order...)
 }, { timestamps: true });
 

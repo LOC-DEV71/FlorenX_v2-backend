@@ -1,10 +1,5 @@
 module.exports.productValidate = async (req, res, next) => {
     try {
-
-        if(req.body.stock){
-            req.body.stock = Number(req.body.stock);
-        }
-
         if(req.body.price){
             req.body.price = Number(req.body.price);
         }
@@ -26,12 +21,7 @@ module.exports.productValidate = async (req, res, next) => {
                 code: false
             })
         }
-        if(req.body.stock <= 0){
-            return res.status(400).json({
-                message: "Vui lòng nhập số lượng sản phẩm",
-                code: false
-            })
-        }
+
 
         next();
     } catch (error) {

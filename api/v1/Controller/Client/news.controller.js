@@ -5,7 +5,7 @@ module.exports.getBySlug = async (req, res) => {
         const news = await News.find({
             deleted: false,
             slug_category: slug,
-            featured: "yes",
+            featured: "true",
             status: "published"
         })
         return res.status(200).json({

@@ -17,7 +17,10 @@ module.exports.index = async (req, res) => {
             const childrenCategoryIds = await getAllProductsHelper.getChildrenCategories(req.query.sortByCategory);
 
             find.product_category_id = {
-                $in: [req.query.sortByCategory, ...childrenCategoryIds]
+                $in: [
+                    new mongoose.Types.ObjectId(req.query.sortByCategory),
+                    ...childrenCategoryIds.map(id => new mongoose.Types.ObjectId(id))
+                ]
             };
         }
 
@@ -184,6 +187,7 @@ module.exports.getListProducts = async (req, res) => {
             }
         ]);
 
+
         return res.status(200).json({
             code: true,
             products,
@@ -202,7 +206,102 @@ module.exports.getListProductNoQuery = async (req, res) => {
         const find = { deleted: false };
         const sort = { position: -1 };
 
-        const products = await Product.find(find).sort(sort)
+       const products = await Product.aggregate([
+            {
+                $match: {
+                    ...find
+                }
+            },
+            { $sort: sort },
+
+            {
+                $lookup: {
+                    from: "stocks",
+                    localField: "_id",
+                    foreignField: "product_id",
+                    as: "stocks"
+                }
+            },
+
+            {
+                $addFields: {
+                    stock: { $sum: "$stocks.quantity" }
+                }
+            },
+
+            {
+                $project: {
+                    stocks: 0
+                }
+            }
+        ]);
+        return res.status(200).json({
+            code: true,
+            products
+        });
+    } catch (error) {
+        return res.status(400).json({
+            code: false,
+            message: `Lỗi: ${error.message}`
+        });
+    }
+};
+
+module.exports.getListExport = async (req, res) => {
+    try {
+        const find = { deleted: false };
+        const sort = { position: -1 };
+
+        const warehouseId = req.query.warehouse_id
+            ? new mongoose.Types.ObjectId(req.query.warehouse_id)
+            : null;
+
+        const products = await Product.aggregate([
+            {
+                $match: {
+                    ...find
+                }
+            },
+            { $sort: sort },
+
+            {
+                $lookup: {
+                    from: "stocks",
+                    let: {
+                        productId: "$_id",
+                        warehouseId: warehouseId
+                    },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ["$product_id", "$$productId"] },
+                                        ...(warehouseId
+                                            ? [{ $eq: ["$warehouse_id", "$$warehouseId"] }]
+                                            : [])
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    as: "stocks"
+                }
+            },
+
+            {
+                $addFields: {
+                    stock: { $sum: "$stocks.quantity" }
+                }
+            },
+
+            {
+                $project: {
+                    stocks: 0
+                }
+            }
+        ]);
+
         return res.status(200).json({
             code: true,
             products
@@ -218,7 +317,6 @@ module.exports.getListProductNoQuery = async (req, res) => {
 // [POST] /api/v1/admin/products/create
 module.exports.create = async (req, res) => {
     try {
-        console.log(req.body.specs)
         if (req.body.title) {
             req.body.slug = slugHelper(req.body.title)
         }
