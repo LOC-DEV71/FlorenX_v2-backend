@@ -9,6 +9,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "active"
   },
+  member: {
+    type: String,
+    enum: ["bronze", "silver", "gold", "diamond"],
+    default: "bronze"
+  },
   avatar: String,
   address: String,
   statusOnline: String,

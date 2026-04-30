@@ -7,6 +7,8 @@ const productRoutes = require("./product.routes")
 const loginRoutes = require("./auth.client.routes")
 const cartRoutes = require("./cart.routes")
 const likeRoutes = require("./like.routes")
+const voucherRoutes = require("./vouchers.routes");
+const checkoutRoutes = require("./checkout.routes");
 
 router.use("/product-categories", productCategoriesRoutes)
 router.use("/news", newsRoutes)
@@ -14,5 +16,7 @@ router.use("/products", productRoutes)
 router.use("/auth", loginRoutes)
 router.use("/cart", cartRoutes)
 router.use("/like", likeRoutes)
+router.use("/vouchers", voucherRoutes)
+router.use("/checkout", checkoutRoutes)
 
 module.exports = router;
