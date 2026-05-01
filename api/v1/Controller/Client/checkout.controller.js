@@ -9,8 +9,8 @@ const jwtHelper = require("../../../../utils/jwt.utils");
 
 
 const environment = new paypal.core.SandboxEnvironment(
-  "AVLmCQeDTY4V61Oz3EDPhSaDLkIAMEy8ldzQHa7Q5BingPpqAntPqRoI40NY-8TKbxlJrkaZad9nNb1t",
-  "EMPnv9Nt9VjTU99m8uTXgsHxzTi8KN_wMTZ_VQ5VX4h3aFnwxaA4zQjU-BqEcYZJIboW2Tnnjz317eY5"
+  process.env.PAY_PAL_ID,
+  process.env.PAY_PAL_SECRET
 );
 const client = new paypal.core.PayPalHttpClient(environment);
 

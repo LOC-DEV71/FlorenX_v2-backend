@@ -15,6 +15,8 @@ const inventoryRoutes = require("./inventoryRoutes.routes.js")
 const warehouseRoutes = require("./warehouse.routes.js")
 const inventoryAuditRoutes = require("./inventory.audit.routes.js")
 const vouchersRoutes = require("./vouchers.routes.js")
+const ordersRoutes = require("./order.routes.js")
+const roomchatsRoutes = require("./roomchat.routes.js")
 
 router.use("/products", productRoutes);
 router.use("/product-categories", productCategoriesRoutes);
@@ -30,5 +32,7 @@ router.use("/inventory", inventoryRoutes);
 router.use("/warehouse", warehouseRoutes);
 router.use("/inventory-audit", inventoryAuditRoutes);
 router.use("/vouchers", vouchersRoutes);
+router.use("/orders", ordersRoutes);
+router.use("/room-chat", roomchatsRoutes);
 
 module.exports = router;
