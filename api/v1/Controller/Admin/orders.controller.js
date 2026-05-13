@@ -4,7 +4,29 @@ const paginationHelper = require("../../../../helper/pagination.helper");
 module.exports.index = async (req, res) => {
     try {
         const keyword = req.query.search;
+        const sortStatus= req.query.sortStatus;
         let find = {};
+
+        switch (sortStatus) {
+            case "pending":
+                find.status= "pending"
+                break;
+            case "confirmed":
+                find.status= "confirmed"
+                break;
+            case "done":
+                find.status= "done"
+                break;
+            case "cancel":
+                find.status= "cancel"
+                break;
+            case "shipped":
+                find.status= "shipped"
+                break;
+        
+            default:
+                break;
+        }
 
         if (keyword) {
             find.$or = [
@@ -41,8 +63,11 @@ module.exports.updateStatus = async (req, res) => {
     try {
         const { ids, action } = req.body;
         let status = "";
-        if (action === "confirm") status = "confirmed";
+        if (action === "confirmed") status = "confirmed";
         if (action === "cancel") status = "cancel";
+        if (action === "done") status = "done";
+        if (action === "shipped") status = "shipped";
+        console.log(action)
 
         await Orders.updateMany({ _id: { $in: ids } }, { status });
 

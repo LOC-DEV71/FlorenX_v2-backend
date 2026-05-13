@@ -8,6 +8,8 @@ const productReviewSchema = new mongoose.Schema(
     index: true
   },
 
+  title: String,
+
   user_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User"
@@ -26,6 +28,11 @@ const productReviewSchema = new mongoose.Schema(
   images: {
     type: [String],
     default: []
+  },
+
+  updated: {
+    type: Boolean,
+    default: false
   }
 
 },

@@ -142,7 +142,8 @@ module.exports.order = async (req, res) => {
         price: item.price,
         discountPercentage: item.discountPercentage,
         quantity: item.quantity,
-        finalPrice: item.price - (item.price * item.discountPercentage / 100)
+        finalPrice: item.price - (item.price * item.discountPercentage / 100),
+        slug: item.slug
       })),
       totalPrice: totalPrice > 0 ? totalPrice : 0, 
       finalPrice: finalTotal > 0 ? finalTotal : 0,
@@ -167,7 +168,7 @@ module.exports.order = async (req, res) => {
       data: {
         discount: voucherData ? voucherData.discountValue : 0
       },
-      orderCode: createOrder.code
+      orderReturn: createOrder
     });
 
   } catch (error) {
@@ -190,7 +191,6 @@ module.exports.getDetailOrder = async (req, res) => {
       code: orderCode,
       email: user.email
     })
-    console.log(order)
 
     res.status(200).json({
       code: true,

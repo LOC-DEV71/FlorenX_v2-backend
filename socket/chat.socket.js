@@ -7,6 +7,7 @@ const chatHandler =  (io, socket) => {
   
   socket.on("client_join_room", async (data) => {
     const { roomId } = data;
+    if(!roomId) return;
     socket.join(roomId)
     if(data.sender === "user"){
       const message = await Message.find({roomId: roomId})

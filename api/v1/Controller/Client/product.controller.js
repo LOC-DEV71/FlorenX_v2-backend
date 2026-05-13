@@ -1,4 +1,5 @@
 const Product = require("../../Models/products.models");
+const ProductPreview = require("../../Models/products.preview");
 const Category = require("../../Models/products.category");
 const getChildrenCategories = require("../../../../helper/getAllProductInCategoryParentId");
 const paginationHelper = require("../../../../helper/pagination.helper");
@@ -135,3 +136,21 @@ module.exports.getProductBySale = async (req, res) => {
         });
     }
 };
+
+module.exports.commentProduct = async (req, res) => {
+    try {
+        const createPrevie = new ProductPreview(req.body);
+        await createPrevie.save();
+
+        return res.status(200).json({
+            message: "Đánh giá thành công",
+            code: true
+        })
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error}`,
+            code: false
+        })
+    }
+}
+
