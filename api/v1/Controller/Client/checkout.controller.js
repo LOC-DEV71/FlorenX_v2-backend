@@ -6,6 +6,7 @@ const Vouchers = require("../../Models/vouchers.model");
 const OrderCode = require("../../../../helper/generalOtp");
 const formSendMail = require("../../../../helper/formSendMail");
 const jwtHelper = require("../../../../utils/jwt.utils");
+const Notification = require("../../Models/notification.model");
 
 
 const environment = new paypal.core.SandboxEnvironment(
@@ -121,7 +122,7 @@ module.exports.order = async (req, res) => {
     })();
 
     const finalTotal = totalPrice - memberDiscount - discountVoucher;
-    
+
 
     const orderCode = OrderCode(10);
 
@@ -145,7 +146,7 @@ module.exports.order = async (req, res) => {
         finalPrice: item.price - (item.price * item.discountPercentage / 100),
         slug: item.slug
       })),
-      totalPrice: totalPrice > 0 ? totalPrice : 0, 
+      totalPrice: totalPrice > 0 ? totalPrice : 0,
       finalPrice: finalTotal > 0 ? finalTotal : 0,
       memberDiscount: memberDiscount > 0 ? memberDiscount : 0,
       voucherDiscount: discountVoucher > 0 ? discountVoucher : 0,
@@ -154,12 +155,27 @@ module.exports.order = async (req, res) => {
     const createOrder = new Orders(orderData);
     await createOrder.save();
 
-    await Carts.updateOne(
-      {user_id: user._id.toString()},
-      {$set: {products: []}}
-    )
+    const createNotifi = new Notification({
+      title: "Bạn có đơn hàng mới",
+      message: `Hệ thống ghi nhận đơn hàng mới #${createOrder.code}. Vui lòng kiểm tra và xác nhận trạng thái đơn hàng.`,
+      type: "order_new",
+      action_url: `/admin/orders/${createOrder.code}`,
+      reference_type: "Order",
+      reference_id: createOrder._id
+    })
+
+    await createNotifi.save();
+
 
     formSendMail.sendOrderConfirmation(email, orderData);
+
+
+    await Carts.updateOne(
+      { user_id: user._id.toString() },
+      { $set: { products: [] } }
+    )
+
+
 
 
     res.status(200).json({

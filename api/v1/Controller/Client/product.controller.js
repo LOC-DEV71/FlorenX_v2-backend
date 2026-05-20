@@ -1,6 +1,6 @@
 const Product = require("../../Models/products.models");
-const ProductPreview = require("../../Models/products.preview");
 const Category = require("../../Models/products.category");
+const ProductPreview = require("../../Models/products.preview");
 const getChildrenCategories = require("../../../../helper/getAllProductInCategoryParentId");
 const paginationHelper = require("../../../../helper/pagination.helper");
 // const Likes = require("../../Models/likes.model");
@@ -8,7 +8,7 @@ const paginationHelper = require("../../../../helper/pagination.helper");
 // const jwtUtils = require("../../../../utils/jwt.utils")
 module.exports.getProductByCategory = async (req, res) => {
     try {
-        const { category } = req.params;
+        const { category } = req.params;    
 
         const productCategory = await Category.findOne({
             slug: category,
@@ -60,8 +60,39 @@ module.exports.getProductByCategory = async (req, res) => {
         const pagination = paginationHelper.pagination(countProducts, req.query);
 
 
-        const products = await Product.find(find).sort({position: -1}).limit(pagination.limit).skip(pagination.skip)
-
+       const products = await Product.aggregate([
+            { $match: find },
+            { $sort: { position: -1 } },
+            { $skip: pagination.skip },
+            { $limit: pagination.limit },
+            {
+                $lookup: {
+                    from: "product_reviews",
+                    localField: "_id",
+                    foreignField: "product_id",
+                    as: "reviews",
+                    pipeline: [
+                        { $project: { rating: 1, _id: 0 } }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    totalReviews: { $size: "$reviews" },
+                    averageRating: {
+                        $cond: {
+                            if: { $gt: [{ $size: "$reviews" }, 0] },
+                            then: { $avg: "$reviews.rating" },
+                            else: 0
+                        }
+                    }
+                }
+            },
+            {
+                // Xóa mảng reviews thô, chỉ giữ totalReviews và averageRating
+                $unset: "reviews"
+            }
+        ]);
 
 
         return res.status(200).json({
@@ -121,10 +152,42 @@ module.exports.getProductBySale = async (req, res) => {
             deleted: false,
             product_category_id: { $in: childListId },
             status: "active",
-            discountPercentage: { $gt: 0 } // chỉ lấy sản phẩm có giảm giá
+            discountPercentage: { $gt: 0 } 
         }
 
-        const products = await Product.find(find).sort({position: -1}).limit(4);
+        const products = await Product.aggregate([
+            {$match: find},
+            { $sort: { position: -1 } },
+            { $limit: 4 },
+            {
+                $lookup: {
+                    from: "product_reviews",
+                    localField: "_id",
+                    foreignField: "product_id",
+                    as: "reviews",
+                    pipeline: [
+                        { $project: { rating: 1, _id: 0 } }
+                    ]
+                } 
+            },
+            {
+                $addFields: {
+                    totalReviews: { $size: "$reviews" },
+                    averageRating: {
+                        $cond: {
+                            if: { $gt: [{ $size: "$reviews" }, 0] },
+                            then: { $avg: "$reviews.rating" },
+                            else: 0
+                        }
+                    }
+                }
+            },
+            {
+                // Xóa mảng reviews thô, chỉ giữ totalReviews và averageRating
+                $unset: "reviews"
+            }
+        ])
+            
         return res.status(200).json({
             code: true,
             products
@@ -137,20 +200,4 @@ module.exports.getProductBySale = async (req, res) => {
     }
 };
 
-module.exports.commentProduct = async (req, res) => {
-    try {
-        const createPrevie = new ProductPreview(req.body);
-        await createPrevie.save();
-
-        return res.status(200).json({
-            message: "Đánh giá thành công",
-            code: true
-        })
-    } catch (error) {
-        return res.status(400).json({
-            message: `Lỗi: ${error}`,
-            code: false
-        })
-    }
-}
 

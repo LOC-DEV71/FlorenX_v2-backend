@@ -10,6 +10,7 @@ const likeRoutes = require("./like.routes")
 const voucherRoutes = require("./vouchers.routes");
 const checkoutRoutes = require("./checkout.routes");
 const ordersRoutes = require("./orders.routes");
+const productPreviewRoutes = require("./product.preview.routes");
 
 router.use("/product-categories", productCategoriesRoutes)
 router.use("/news", newsRoutes)
@@ -20,5 +21,6 @@ router.use("/like", likeRoutes)
 router.use("/vouchers", voucherRoutes)
 router.use("/checkout", checkoutRoutes)
 router.use("/orders", ordersRoutes)
+router.use("/product-preview", productPreviewRoutes)
 
 module.exports = router;

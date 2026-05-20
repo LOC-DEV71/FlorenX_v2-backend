@@ -6,6 +6,5 @@ const controller = require("../../Controller/Client/product.controller");
 router.get("/:category", controller.getProductByCategory);
 router.get("/detail/:slug", controller.getProductBySlug);
 router.get("/sale/:category", controller.getProductBySale);
-router.post("/comment", controller.commentProduct);
 
 module.exports = router;

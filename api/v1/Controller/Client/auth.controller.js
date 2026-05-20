@@ -43,7 +43,19 @@ module.exports.googleLogin = async (req, res) => {
     const payload = ticket.getPayload();
     const { email, name, picture } = payload;
 
+    const exitStatusUsers = await Users.findOne({
+      email: email
+    })
+
+    if(exitStatusUsers.status === "inactive"){
+      return res.status(400).json({
+        message: "Tài khoản đang bị khóa",
+        code: false
+      })
+    }
+
     let user = await Users.findOne({ email, deleted: false });
+
 
     if (!user) {
       user = new Users({
@@ -60,6 +72,7 @@ module.exports.googleLogin = async (req, res) => {
 
     const tokenSystem = jwtHelper.createToken({
       id: user._id,
+      email: user.email,
       type: "login",
     });
 
@@ -147,7 +160,7 @@ module.exports.logLocal = async (req, res) => {
       return res.status(400).json({ message: "Mật khẩu không chính xác", code: false });
     }
 
-    const tokenSystem = jwtHelper.createToken({ id: user._id, type: "login" });
+    const tokenSystem = jwtHelper.createToken({ id: user._id, email: user.email, type: "login" });
 
     res.cookie("token_client", tokenSystem, {
       httpOnly: true, secure: false, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000

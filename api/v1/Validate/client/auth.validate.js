@@ -36,6 +36,14 @@ module.exports.authValidate = async (req, res, next) => {
             })
         }
 
+        if(exitEmail.status === "inactive"){
+            return res.status(400).json({
+                message: "Tài khoản bị khóa",
+                code: false
+            })
+        }
+
+
         if(!req.body.password){
             return res.status(400).json({
                 message: "Vui lòng nhập mật khẩu",
