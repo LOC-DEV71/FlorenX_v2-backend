@@ -8,6 +8,17 @@ const productReviewSchema = new mongoose.Schema(
     index: true
   },
 
+  server_return: {
+    admin_name: String,
+    avatar: String,
+    role: String,
+    comment: String,
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  },
+
   title: String,
 
   user_id: {

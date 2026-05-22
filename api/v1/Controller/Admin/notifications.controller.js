@@ -34,3 +34,25 @@ module.exports.readNotification = async (req, res) => {
         })
     }
 }
+
+module.exports.readAllNotification = async (req, res) => {
+    try {
+        const notification = await Notifications.find({
+            is_read: false
+        })
+        const ids = notification.map(item => item._id.toString());
+        
+        await Notifications.updateMany(
+            {_id: {$in: ids}},
+            {is_read: true}
+        )
+        return res.status(200).json({
+            code: true,
+        })
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error}`,
+            code: false
+        })
+    }
+}

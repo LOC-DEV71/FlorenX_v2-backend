@@ -19,6 +19,8 @@ module.exports.commentProduct = async (req, res) => {
             });
         }
 
+        req.body.updated = false;
+
         // Tạo comment
         const createPreview = new ProductPreview(req.body);
         await createPreview.save();
@@ -55,7 +57,7 @@ module.exports.commentProduct = async (req, res) => {
                 </span>.
             `,
             type: "rating",
-            action_url: `/admin/products/${product.slug}`,
+            action_url: `/admin/products/detail/${product.slug}`,
             reference_type: "Product",
             reference_id: product._id,
         });

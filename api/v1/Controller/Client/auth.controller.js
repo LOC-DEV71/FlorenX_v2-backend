@@ -47,7 +47,7 @@ module.exports.googleLogin = async (req, res) => {
       email: email
     })
 
-    if(exitStatusUsers.status === "inactive"){
+    if(exitStatusUsers?.status === "inactive"){
       return res.status(400).json({
         message: "Tài khoản đang bị khóa",
         code: false

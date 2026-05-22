@@ -417,7 +417,10 @@ module.exports.getProductBySlug = async (req, res) => {
         const data = await Product.findOne({
             slug: slug,
             deleted: false
-        })
+        }).lean();
+
+        const stock = await ProductStock.findOne({product_id: data._id}).lean();
+        data.stock = stock.quantity;
 
         return res.status(200).json({
             message: "Lấy thành công",

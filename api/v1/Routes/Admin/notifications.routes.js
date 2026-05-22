@@ -7,5 +7,6 @@ const controller = require("../../Controller/Admin/notifications.controller");
 
 router.get("/get-list", controller.getList)
 router.post("/read/:id", controller.readNotification)
+router.post("/read-all", controller.readAllNotification)
 
 module.exports = router;
