@@ -76,6 +76,7 @@ module.exports.index = async (req, res) => {
     });
 
     const news = await News.find(find)
+      .select("-content")
       .sort(sort)
       .skip(pagination.skip)
       .limit(pagination.limit);

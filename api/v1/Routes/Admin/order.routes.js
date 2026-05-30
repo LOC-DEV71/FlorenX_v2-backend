@@ -10,6 +10,11 @@ router.get(
   middleware.permissionMiddleWare("view_orders"),
   controller.index
 );
+router.get(
+  "/detail/:code",
+  middleware.permissionMiddleWare("view_orders"),
+  controller.getDetailOrder
+);
 router.patch(
   "/update-status",
   middleware.permissionMiddleWare("update_orders"),

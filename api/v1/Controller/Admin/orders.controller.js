@@ -63,6 +63,7 @@ module.exports.index = async (req, res) => {
 module.exports.updateStatus = async (req, res) => {
     try {
         const { ids, action } = req.body;
+    
 
         const validStatuses = ["pending", "confirmed", "shipped", "done", "cancel"];
 
@@ -117,6 +118,17 @@ module.exports.updateStatus = async (req, res) => {
         }
 
         res.json({ code: true, message: "Cập nhật thành công" });
+    } catch (error) {
+        res.status(400).json({ code: false, message: `Lỗi update: ${error.message}` });
+    }
+};
+module.exports.getDetailOrder = async (req, res) => {
+    try {
+        const code = req.params.code;
+        
+        const order = await Orders.findOne({code: code});
+
+        res.json({ code: true, message: "OK", order  });
     } catch (error) {
         res.status(400).json({ code: false, message: `Lỗi update: ${error.message}` });
     }

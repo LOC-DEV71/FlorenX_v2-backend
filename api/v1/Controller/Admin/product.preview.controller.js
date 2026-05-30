@@ -79,6 +79,7 @@ module.exports.serverReturnReview = async (req, res) => {
             role: decode.role,
             avatar: user.avatar,
             comment: req.body.comment,
+            createdAt: Date.now()
         }
         await ProductPreview.updateOne(
             {_id: req.body.id},
