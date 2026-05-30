@@ -8,7 +8,7 @@ const paginationHelper = require("../../../../helper/pagination.helper");
 // const jwtUtils = require("../../../../utils/jwt.utils")
 module.exports.getProductByCategory = async (req, res) => {
     try {
-        const { category } = req.params;    
+        const { category } = req.params;   
 
         const productCategory = await Category.findOne({
             slug: category,
