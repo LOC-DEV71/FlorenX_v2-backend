@@ -104,10 +104,10 @@ module.exports.askGemini = async (userMessage, categoriesContext = "", productsC
         // const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite-001" });
 
         // 2. Bản Flash chuẩn, thông minh hơn nhưng Free Tier bị giới hạn (20 req/ngày):
-        // const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         // 3. Bản Flash 2.0 (Ổn định, hạn mức Free khá cao):
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        // const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         // 4. Bản PRO cực xịn (Bắt buộc phải add thẻ tín dụng vào Google Cloud mới gọi được API):
         // const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
