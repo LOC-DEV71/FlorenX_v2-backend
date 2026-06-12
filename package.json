@@ -12,6 +12,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@paypal/checkout-server-sdk": "^1.0.3",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.9.0",

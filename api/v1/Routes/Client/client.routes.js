@@ -11,6 +11,7 @@ const voucherRoutes = require("./vouchers.routes");
 const checkoutRoutes = require("./checkout.routes");
 const ordersRoutes = require("./orders.routes");
 const productPreviewRoutes = require("./product.preview.routes");
+const aiRoutes = require("./ai.routes");
 
 router.use("/product-categories", productCategoriesRoutes)
 router.use("/news", newsRoutes)
@@ -22,5 +23,6 @@ router.use("/vouchers", voucherRoutes)
 router.use("/checkout", checkoutRoutes)
 router.use("/orders", ordersRoutes)
 router.use("/product-preview", productPreviewRoutes)
+router.use("/ai", aiRoutes)
 
 module.exports = router;
