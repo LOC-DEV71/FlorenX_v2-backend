@@ -1,8 +1,11 @@
 const Product = require("../../Models/products.models");
 const Category = require("../../Models/products.category");
+const Cart = require("../../Models/cart.model");
 const ProductPreview = require("../../Models/products.preview");
 const getChildrenCategories = require("../../../../helper/getAllProductInCategoryParentId");
 const paginationHelper = require("../../../../helper/pagination.helper");
+const jwt = require("../../../../utils/jwt.utils");
+const mongoose = require("mongoose");
 // const Likes = require("../../Models/likes.model");
 // const Users = require("../../Models/user.models");
 // const jwtUtils = require("../../../../utils/jwt.utils")
@@ -199,5 +202,114 @@ module.exports.getProductBySale = async (req, res) => {
         });
     }
 };
+
+module.exports.getCrossSellProducts = async (req, res) => {
+    try {
+        const tokenCart = req.cookies.cart;
+        if (!tokenCart) {
+            return res.status(400).json({ code: false, message: "Không tìm thấy giỏ hàng trong cookie" });
+        }
+
+        const decode = jwt.verifyToken(tokenCart);
+        if (!decode || !decode.id) {
+            return res.status(400).json({ code: false, message: "Token giỏ hàng không hợp lệ" });
+        }
+
+        const cart = await Cart.findOne({_id: decode.id});
+        if (!cart) {
+            return res.status(400).json({ code: false, message: "Giỏ hàng không tồn tại" });
+        }
+
+        const productIds = cart.products?.map((item) => item.product_id) || [];
+        if (productIds.length === 0) {
+            return res.status(200).json({ code: true, products: [] });
+        }
+        const product_category = await Product.find({
+            _id: { $in: productIds },
+            deleted: false,
+            status: "active"
+        }).select("product_category_id")
+
+        
+        const product_category_select_ids = [...new Set(product_category.map((item) => item.product_category_id.toString()))];
+
+        // LẤY RA DANH MỤC CHA CỦA CÁC SẢN PHẨM TRONG GIỎ HÀNG
+        const cartCategories = await Category.find({ _id: { $in: product_category_select_ids } });
+        const cartParentCategoryIds = cartCategories.map(cat => cat.parent_id ? cat.parent_id.toString() : cat._id.toString());
+
+        const categoryIds = await Category.find({
+            status: "active",
+            deleted: false,
+            parent_id: null
+        }).select("_id")
+        const categoryIdsString = categoryIds.map(item => item._id.toString());
+        
+        // BÂY GIỜ LỌC: Các danh mục tổng trừ đi danh mục cha của các sản phẩm trong giỏ
+        const categoryFilter = categoryIdsString.filter(item => !cartParentCategoryIds.includes(item));
+        const shuffled = categoryFilter.sort(() => 0.5 - Math.random());
+        const randomCategory = shuffled.slice(0, 4);    
+
+
+
+        const cross_sell_promises = randomCategory.map(async (item) => {
+            const childIds = await getChildrenCategories.getChildrenCategories(item);
+            const allCategoryIds = [item, ...childIds].map(id => new mongoose.Types.ObjectId(id));
+
+            return await Product.aggregate([
+                { 
+                    $match: {
+                        product_category_id: { $in: allCategoryIds },
+                        deleted: false,
+                        status: "active"
+                    } 
+                },
+                { $sample: { size: 1 } }, // MongoDB tự động trộn ngẫu nhiên TẤT CẢ kết quả và lấy ra tối đa 1 item
+                {
+                $lookup: {
+                    from: "product_reviews",
+                    localField: "_id",
+                    foreignField: "product_id",
+                    as: "reviews",
+                    pipeline: [
+                        { $project: { rating: 1, _id: 0 } }
+                    ]
+                } 
+            },
+            {
+                $addFields: {
+                    totalReviews: { $size: "$reviews" },
+                    averageRating: {
+                        $cond: {
+                            if: { $gt: [{ $size: "$reviews" }, 0] },
+                            then: { $avg: "$reviews.rating" },
+                            else: 0
+                        }
+                    }
+                }
+            },
+            {
+                // Xóa mảng reviews thô và loại bỏ description nặng để API load nhanh hơn
+                $unset: ["reviews", "description"]
+            }
+            ]);
+        });
+
+
+        const cross_sell_results = await Promise.all(cross_sell_promises);
+
+        const cross_sell = cross_sell_results.flat();
+
+        return res.status(200).json({
+            code: true,
+            products: cross_sell
+        });
+
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error.message}`,
+            code: false
+        });
+    }
+}
 
 
