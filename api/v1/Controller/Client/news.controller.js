@@ -9,7 +9,9 @@ module.exports.getByCategorySlug = async (req, res) => {
             deleted: false,
             slug_category: slug,
             status: "published"
-        }).sort({ createdAt: -1 });
+        })
+        .select("-content")
+        .sort({ createdAt: -1 });
 
         return res.status(200).json({
             code: true, 
@@ -65,7 +67,7 @@ module.exports.getCategories = async (req, res) => {
         const categories = await NewsCategory.find({
             deleted: false,
             status: "active"
-        });
+        }).select("title slug");
 
         return res.status(200).json({
             code: true, 
@@ -86,6 +88,7 @@ module.exports.getRecent = async (req, res) => {
             deleted: false,
             status: "published"
         })
+        .select("-content")
         .sort({ createdAt: -1 })
         .limit(4);
 
