@@ -132,11 +132,11 @@ module.exports.googleLogin = async (req, res) => {
     const tokenCart = jwtHelper.createToken({ id: userCart._id, type: "cart" });
 
     res.cookie("cart", tokenCart, {
-      httpOnly: true, secure: false, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     res.cookie("token_client", tokenSystem, {
-      httpOnly: true, secure: false, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     return res.json({ ok: true, data: user });
@@ -163,7 +163,7 @@ module.exports.logLocal = async (req, res) => {
     const tokenSystem = jwtHelper.createToken({ id: user._id, email: user.email, type: "login" });
 
     res.cookie("token_client", tokenSystem, {
-      httpOnly: true, secure: false, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     // --- LOGIC CART GIỮ NGUYÊN ---
@@ -197,7 +197,7 @@ module.exports.logLocal = async (req, res) => {
 
     const tokenCart = jwtHelper.createToken({ id: userCart._id, type: "cart" });
     res.cookie("cart", tokenCart, {
-      httpOnly: true, secure: false, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     return res.json({ code: true, message: "Đăng nhập thành công" });
@@ -299,7 +299,7 @@ module.exports.confirm = async (req, res) => {
     const tokenSystem = jwtHelper.createToken({ id: user._id, type: "login" });
 
     res.cookie("token_client", tokenSystem, {
-      httpOnly: true, secure: false, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     return res.status(200).json({ message: "Xác thực OTP và đăng nhập thành công", code: true });
@@ -343,7 +343,7 @@ module.exports.forgotPasswordOtp = async (req, res) => {
     const tokenSystem = jwtHelper.createToken({ id: user._id, type: "login" });
 
     res.cookie("token_client", tokenSystem, {
-      httpOnly: true, secure: false, sameSite: "lax", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
     });
     
     return res.status(200).json({ message: "Xác thực thành công", code: true });
