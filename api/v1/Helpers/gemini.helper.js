@@ -1,13 +1,11 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-// Khởi tạo Gemini bằng API Key lấy từ biến môi trường
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const System = require("../Models/system.model");
 
 // Hàm tạo Prompt cho AI
-const generatePrompt = (userMessage, categoriesContext, productsContext, chatHistory, ordersContext) => {
+const generatePrompt = (userMessage, categoriesContext, productsContext, chatHistory, ordersContext, customPrompt) => {
     // SYSTEM PROMPT - Xây dựng "Nhân cách" cho AI
 const systemPrompt = `
-Bạn là "Veltrix-chan" 💖 — cô trợ lý AI đáng yêu, năng động và mê công nghệ của Veltrix Gear.
+${customPrompt || 'Bạn là "Veltrix-chan" 💖 — cô trợ lý AI đáng yêu, năng động và mê công nghệ của Veltrix Gear.'}
 
 TÍNH CÁCH:
 - Cực kỳ thân thiện, dễ thương, hay dùng từ cảm thán như: "yaaay~", "hihi", "úi", "trời ơi", "hông nè", "nhaa~".
@@ -98,26 +96,60 @@ Câu hỏi hiện tại:
 // Hàm chính để gọi Gemini
 module.exports.askGemini = async (userMessage, categoriesContext = "", productsContext = "", chatHistory = "", ordersContext = "") => {
     try {
-        // Các model dự phòng (Mở comment 1 dòng để dùng, nhớ comment các dòng còn lại):
+        // Lấy cấu hình hệ thống từ DB
+        let systemConfig = await System.findOne({});
+        if (!systemConfig) {
+            systemConfig = await System.create({}); // Tạo mặc định nếu chưa có
+        }
+
+        // Kiểm tra xem AI có đang bị khóa không
+        if (systemConfig.ai && systemConfig.ai.status === false) {
+            return "Hệ thống AI ChatBot hiện đang được bảo trì hoặc tạm khóa bởi Quản trị viên. 🥺 Cậu vui lòng liên hệ nhân viên qua hotline nha! 💖";
+        }
+
+        // Logic reset quota qua ngày mới
+        const today = new Date().toDateString();
+        const lastReset = new Date(systemConfig.ai?.lastResetDate || Date.now()).toDateString();
+        if (today !== lastReset) {
+            systemConfig.ai.requestsToday = 0;
+            systemConfig.ai.lastResetDate = new Date();
+            await systemConfig.save();
+        }
+
+        // Lấy model từ DB
+        const aiModel = systemConfig.ai?.model || "gemini-3.5-flash";
+
+        // Kiểm tra xem đã cấu hình API Key chưa
+        if (!systemConfig.ai?.apiKey) {
+            return "Hệ thống chưa được cấu hình API Key. Quản trị viên vui lòng vào mục Cấu hình AI để nhập API Key! 🥺";
+        }
+
+        const genAI = new GoogleGenerativeAI(systemConfig.ai.apiKey);
+
+        // Lấy cấu hình Limit từ danh sách model trong DB
+        const aiModelsList = systemConfig.aiModels || [];
+        const selectedModelConfig = aiModelsList.find(m => m.code === aiModel);
+        const actualLimit = selectedModelConfig?.dailyLimit || 20;
         
-        // 1. Bản nhẹ, siêu nhanh, quota Free cực nhiều (Khuyên dùng hiện tại):
-        // const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-lite-001" });
+        const requestsToday = systemConfig.ai?.requestsToday || 0;
+        
+        if (requestsToday >= actualLimit) {
+            return "Huhu Veltrix-chan đã xài hết năng lượng (Quota) ngày hôm nay rồi... 🥺 Cậu vui lòng chat lại vào ngày mai hoặc nhắn trực tiếp cho nhân viên nhé! 💖";
+        }
 
-        // 2. Bản Flash chuẩn, thông minh hơn nhưng Free Tier bị giới hạn (20 req/ngày):
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const model = genAI.getGenerativeModel({ model: aiModel });
 
-        // 3. Bản Flash 2.0 (Ổn định, hạn mức Free khá cao):
-        // const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-        // 4. Bản PRO cực xịn (Bắt buộc phải add thẻ tín dụng vào Google Cloud mới gọi được API):
-        // const model = genAI.getGenerativeModel({ model: "gemini-2.5-pro" });
-
+        console.log("Sử dụng Model:", aiModel);
         // Nạp prompt đầy đủ nhân cách và ngữ cảnh
-        const finalPrompt = generatePrompt(userMessage, categoriesContext, productsContext, chatHistory, ordersContext);
+        const finalPrompt = generatePrompt(userMessage, categoriesContext, productsContext, chatHistory, ordersContext, systemConfig.ai?.prompt);
 
         // Gọi API lên Google
         const result = await model.generateContent(finalPrompt);
         const response = await result.response;
+        
+        // Tăng số lượng request đã dùng
+        await System.updateOne({ _id: systemConfig._id }, { $inc: { "ai.requestsToday": 1 } });
+
         return response.text();
 
     } catch (error) {

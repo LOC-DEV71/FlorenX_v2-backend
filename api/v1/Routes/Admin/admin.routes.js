@@ -20,6 +20,7 @@ const roomchatsRoutes = require("./roomchat.routes.js")
 const usersRoutes = require("./users.routes.js")
 const notificationsRoutes = require("./notifications.routes.js")
 const productPreviewRoutes = require("./product.preview.routes.js")
+const systemRoutes = require("./system.routes.js")
 
 router.use("/products", productRoutes);
 router.use("/product-categories", productCategoriesRoutes);
@@ -40,5 +41,6 @@ router.use("/room-chat", roomchatsRoutes);
 router.use("/users", usersRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/product-preview", productPreviewRoutes);
+router.use("/system", systemRoutes);
 
 module.exports = router;
