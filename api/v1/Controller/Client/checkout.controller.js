@@ -107,24 +107,26 @@ module.exports.order = async (req, res) => {
 
 
     const totalPrice = req.body.products.reduce((total, item) => total + (item.price - item.price * item.discountPercentage / 100) * item.quantity, 0);
-    const discountVoucher = (() => {
-      if (!voucherData) return 0;
+
+    let discountVoucher = 0;
+    if (voucherData) {
       if (totalPrice < voucherData.minOrderValue) {
-        return res.status(404).json({
+        return res.status(400).json({
           code: false,
-          message: `Voucher chưa đủ điều kiện`,
+          message: `Voucher chưa đủ điều kiện (yêu cầu đơn tối thiểu ${voucherData.minOrderValue}đ)`,
         });
       }
       if (voucherData.discountType === "percentage") {
         const percentDiscount = totalPrice * voucherData.discountValue / 100;
-        return Math.min(percentDiscount, voucherData.maxDiscount || Infinity)
+        discountVoucher = Math.min(percentDiscount, voucherData.maxDiscount || Infinity);
+      } else {
+        discountVoucher = voucherData.discountValue;
       }
+    }
 
-      return voucherData.discountValue;
-    })();
-
-    const memberDiscount = (() => {
-      if (!user) return;
+    let memberDiscount = 0;
+    if (user && user.member) {
+      let tierConfig = null;
       switch (user.member) {
         case "diamond":
           tierConfig = { rate: 0.15, max: 5000000, minOrder: 10000000 };
@@ -138,14 +140,13 @@ module.exports.order = async (req, res) => {
         case "bronze":
           tierConfig = { rate: 0.05, max: 1000000, minOrder: 10000000 };
           break;
-        default:
-          return 0;
       }
 
-      if (totalPrice < tierConfig.minOrder) return 0;
-      const discountAmount = totalPrice * tierConfig.rate;
-      return Math.min(discountAmount, tierConfig.max);
-    })();
+      if (tierConfig && totalPrice >= tierConfig.minOrder) {
+        const discountAmount = totalPrice * tierConfig.rate;
+        memberDiscount = Math.min(discountAmount, tierConfig.max);
+      }
+    }
 
     const finalTotal = totalPrice - memberDiscount - discountVoucher;
 
