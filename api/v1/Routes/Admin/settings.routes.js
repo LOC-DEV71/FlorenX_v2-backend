@@ -5,10 +5,13 @@ const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 const cloudinary = require("../../../../service/cloudinary.service");
 
-router.get("/detail", controller.detail);
+const middleware = require("../../Middleware/admin/permission.middleware");
+
+router.get("/detail", middleware.permissionMiddleWare("setting_management"), controller.detail);
 
 router.patch(
   "/update",
+  middleware.permissionMiddleWare("setting_management"),
   upload.fields([
     { name: "logo", maxCount: 1 },
     { name: "favicon", maxCount: 1 },
