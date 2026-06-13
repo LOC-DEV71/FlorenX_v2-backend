@@ -15,6 +15,9 @@ const Permission = require("../../Models/permission.models");
 const News = require("../../Models/news.model");
 const slugify = require("slugify");
 const path = require("path");
+const pdfParse = require("pdf-parse");
+const mammoth = require("mammoth");
+const { getOnlineAdmins } = require("../../../../socket/admin.presence.socket");
 
 const generatePDFBuffer = (title, content) => {
     return new Promise((resolve, reject) => {
@@ -46,7 +49,18 @@ const generatePDFBuffer = (title, content) => {
 // [GET] /api/v1/admin/ai/history
 module.exports.history = async (req, res) => {
     try {
-        const messages = await AiMessageAdmin.find({ sessionId: "admin_session" }).sort({ createdAt: 1 });
+        const token = req.cookies.token;
+        let userId = "admin_session";
+        if (token) {
+            const decoded = await jwtUtils.verifyToken(token);
+            if (decoded && decoded.id) {
+                userId = decoded.id.toString();
+            }
+        }
+
+        const sessionId = `admin_${userId}`;
+        const messages = await AiMessageAdmin.find({ sessionId }).sort({ createdAt: 1 });
+        console.log(`HISTORY ENDPOINT: sessionId=${sessionId}, found ${messages.length} messages`);
         res.status(200).json({
             code: 200,
             data: messages
@@ -60,53 +74,129 @@ module.exports.history = async (req, res) => {
 // [POST] /api/v1/admin/ai/chat
 module.exports.chat = async (req, res) => {
     try {
-        const { message, chatHistory } = req.body;
+        let { message, chatHistory } = req.body;
+        
+        let uploadedImages = [];
+        let documentContext = "";
+
+        if (req.files && req.files.length > 0) {
+            for (const file of req.files) {
+                if (file.mimetype.startsWith("image/")) {
+                    try {
+                        const result = await uploadImageBuffer(file.buffer);
+                        if (result && result.secure_url) {
+                            uploadedImages.push(result.secure_url);
+                        }
+                    } catch (err) {
+                        console.error("Lỗi upload ảnh:", err);
+                    }
+                } else if (file.mimetype === "application/pdf") {
+                    try {
+                        const data = await pdfParse(file.buffer);
+                        documentContext += `\n[Nội dung tài liệu PDF: ${file.originalname}]\n${data.text}\n`;
+                    } catch (err) {
+                        console.error("Lỗi đọc PDF:", err);
+                    }
+                } else if (
+                    file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || 
+                    file.mimetype === "application/msword"
+                ) {
+                    try {
+                        const result = await mammoth.extractRawText({ buffer: file.buffer });
+                        documentContext += `\n[Nội dung tài liệu Word: ${file.originalname}]\n${result.value}\n`;
+                    } catch (err) {
+                        console.error("Lỗi đọc Word:", err);
+                    }
+                } else if (file.mimetype === "text/plain") {
+                    documentContext += `\n[Nội dung tài liệu Text: ${file.originalname}]\n${file.buffer.toString('utf-8')}\n`;
+                }
+            }
+        }
+        
+        // Vẫn hỗ trợ fallback nếu frontend truyền images qua string (không có file mới)
+        if (req.body.images && uploadedImages.length === 0) {
+            uploadedImages = Array.isArray(req.body.images) ? req.body.images : [req.body.images];
+        }
+        if (typeof chatHistory === 'string') {
+            try {
+                chatHistory = JSON.parse(chatHistory);
+            } catch (e) {
+                chatHistory = [];
+            }
+        }
 
         // Lấy token và quyền của user hiện tại
         const token = req.cookies.token;
         let userPermissions = [];
+        let userId = "admin_session";
         if (token) {
-            const {id, role} = await jwtUtils.verifyToken(token);
-            const exitAccount = await Account.findOne({ _id: id, role_slug: role }).lean();
-            if (exitAccount) {
-                const exitRole = await Role.findOne({ slug: exitAccount.role_slug }).lean();
-                userPermissions = exitRole?.permissions || [];
+            const decoded = await jwtUtils.verifyToken(token);
+            if (decoded && decoded.id) {
+                userId = decoded.id.toString();
+                const exitAccount = await Account.findOne({ _id: decoded.id, role_slug: decoded.role }).lean();
+                if (exitAccount) {
+                    const exitRole = await Role.findOne({ slug: exitAccount.role_slug }).lean();
+                    userPermissions = exitRole?.permissions || [];
+                }
             }
         }
+
+        // Lưu tin nhắn của User
+        if (message) {
+            await AiMessageAdmin.create({ sessionId: `admin_${userId}`, sender: "user", text: message });
+        }
         
-        const permissionsContext = userPermissions.length > 0 
-            ? userPermissions.join(", ") 
-            : "Chưa phân quyền";
+        let permissionsContext = "";
+        if (userPermissions.length === 0) {
+            permissionsContext = "KHÔNG CÓ QUYỀN GÌ CẢ (CHỈ LÀ NHÂN VIÊN QUÈN / THỰC TẬP SINH)";
+        } else if (userPermissions.length < 5) {
+            permissionsContext = `CÓ RẤT ÍT QUYỀN (CHỈ LÀ NHÂN VIÊN BÌNH THƯỜNG): ${userPermissions.join(", ")}`;
+        } else {
+            permissionsContext = userPermissions.join(", ");
+        }
 
         // Lấy danh sách toàn bộ các quyền mà hệ thống hỗ trợ
         const allPermissionDocs = await Permission.find({}).lean();
         const systemPermissionsContext = allPermissionDocs.map(g => g.permissions.map(p => p.value)).flat().join(", ");
 
-        // Thu thập tổng quan hệ thống để làm Context
-        const totalOrders = await Order.countDocuments();
-        const pendingOrders = await Order.countDocuments({ status: "pending" });
-        const processingOrders = await Order.countDocuments({ status: "processing" });
-        const totalProducts = await Product.countDocuments({ status: "active" });
-        const totalUsers = await User.countDocuments({ status: "active" });
+        // Lấy danh sách quản trị viên đang online (sử dụng io được lưu toàn cục)
+        const onlineAdmins = getOnlineAdmins(req);
+        const onlineContext = onlineAdmins.length > 0
+            ? onlineAdmins.map(a => `${a.fullname} (Chức vụ: ${a.role})`).join(", ")
+            : "Hiện tại hệ thống không ghi nhận quản trị viên nào khác đang online ngoài bạn.";
 
-        // Tính tổng doanh thu (chỉ tính đơn hàng đã được giao thành công hoặc đã xử lý)
-        const completedOrders = await Order.find({ status: { $in: ["delivered", "success", "processing", "shipped", "done"] } });
-        let totalRevenue = 0;
-        completedOrders.forEach(order => {
-            totalRevenue += order.finalPrice || order.totalPrice || 0;
-        });
+        let dashboardContext = `
+DỮ LIỆU TỔNG QUAN:
+[TỪ CHỐI TRUY CẬP] Tài khoản hiện tại KHÔNG CÓ QUYỀN (view_dashboard) để xem dữ liệu thống kê, doanh thu, hay tổng số liệu đơn hàng. Tuyệt đối KHÔNG báo cáo doanh thu hay số liệu nào khác, và hãy dựa vào sự thiếu sót quyền hạn này để mỉa mai tài khoản.
+- DANH SÁCH NHÂN SỰ ĐANG ONLINE (LƯU Ý QUAN TRỌNG: NẾU SẾP HỎI 'CÓ ADMIN NÀO ONLINE KHÔNG' HOẶC 'CÓ AI ONLINE KHÔNG', BẠN PHẢI ĐỌC HẾT TẤT CẢ DANH SÁCH SAU ĐÂY VÀ KHÔNG ĐƯỢC BỎ SÓT BẤT KỲ AI DÙ HỌ CHỈ LÀ CSKH): ${onlineContext}
+`;
 
-        // Đơn hàng đang giao (shipped)
-        const shippedOrdersCount = await Order.countDocuments({ status: "shipped" });
+        if (userPermissions.includes("view_dashboard") || userPermissions.includes("view_orders")) {
+            // Thu thập tổng quan hệ thống để làm Context
+            const totalOrders = await Order.countDocuments();
+            const pendingOrders = await Order.countDocuments({ status: "pending" });
+            const processingOrders = await Order.countDocuments({ status: "processing" });
+            const totalProducts = await Product.countDocuments({ status: "active" });
+            const totalUsers = await User.countDocuments({ status: "active" });
 
-        // Lấy 3 đơn hàng mới nhất
-        const recentOrders = await Order.find({}).sort({ createdAt: -1 }).limit(3);
-        const recentOrdersText = recentOrders.map(o => `- Mã: ${o.code} | Khách: ${o.fullname || o.email} | Trạng thái: ${o.status} | Tổng tiền: ${o.finalPrice || o.totalPrice}`).join("\n");
+            // Tính tổng doanh thu (chỉ tính đơn hàng đã được giao thành công hoặc đã xử lý)
+            const completedOrders = await Order.find({ status: { $in: ["delivered", "success", "processing", "shipped", "done"] } });
+            let totalRevenue = 0;
+            completedOrders.forEach(order => {
+                totalRevenue += order.finalPrice || order.totalPrice || 0;
+            });
 
-        // Định dạng tiền tệ VND
-        const formattedRevenue = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalRevenue);
+            // Đơn hàng đang giao (shipped)
+            const shippedOrdersCount = await Order.countDocuments({ status: "shipped" });
 
-        const dashboardContext = `
+            // Lấy 3 đơn hàng mới nhất
+            const recentOrders = await Order.find({}).sort({ createdAt: -1 }).limit(3);
+            const recentOrdersText = recentOrders.map(o => `- Mã: ${o.code} | Khách: ${o.fullname || o.email} | Trạng thái: ${o.status} | Tổng tiền: ${o.finalPrice || o.totalPrice}`).join("\n");
+
+            // Định dạng tiền tệ VND
+            const formattedRevenue = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalRevenue);
+
+            dashboardContext = `
 DỮ LIỆU TỔNG QUAN:
 - Tổng số đơn hàng trong hệ thống: ${totalOrders}
 - Đơn hàng chờ duyệt (pending): ${pendingOrders}
@@ -116,12 +206,12 @@ DỮ LIỆU TỔNG QUAN:
 - Tổng số khách hàng: ${totalUsers}
 - Tổng doanh thu ước tính: ${formattedRevenue}
 
+- DANH SÁCH NHÂN SỰ ĐANG ONLINE (LƯU Ý QUAN TRỌNG: NẾU SẾP HỎI 'CÓ ADMIN NÀO ONLINE KHÔNG' HOẶC 'CÓ AI ONLINE KHÔNG', BẠN PHẢI ĐỌC HẾT TẤT CẢ DANH SÁCH SAU ĐÂY VÀ KHÔNG ĐƯỢC BỎ SÓT BẤT KỲ AI DÙ HỌ CHỈ LÀ CSKH): ${onlineContext}
+
 3 ĐƠN HÀNG MỚI NHẤT VỪA ĐẶT:
 ${recentOrdersText || "Chưa có đơn hàng nào."}
-        `;
-
-        // Lưu tin nhắn của user
-        await AiMessageAdmin.create({ sessionId: "admin_session", sender: "user", text: message });
+            `;
+        }
 
         // Callback function để AI gọi khi cần xử lý
         const processOrderCallback = async (functionName, args) => {
@@ -146,6 +236,16 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
             }
             
             if (functionName === "toggleAutoProcessOrders") {
+                const hasSystemManage = userPermissions.includes("system_management");
+                const hasOrderManage = userPermissions.includes("update_orders");
+                const hasProductManage = userPermissions.includes("update_products");
+
+                if (!hasSystemManage || !hasOrderManage || !hasProductManage) {
+                    return { 
+                        status: "error", 
+                        message: "Từ chối thực thi: Sếp cần có đồng thời cả 3 quyền 'system_management', 'update_orders', và 'update_products' để bật tắt Auto-Pilot." 
+                    };
+                }
                 const system = await System.findOne({});
                 if (!system) return { status: "error", message: "Không tìm thấy cấu hình hệ thống." };
                 
@@ -218,8 +318,12 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                     return { status: "error", message: "Hệ thống từ chối: Sếp không có quyền tạo bài viết (create_news)." };
                 }
                 try {
-                    // Chỉ dùng ảnh thật từ findProduct, KHÔNG dùng ảnh giả
+                    // Chấp nhận ảnh thật từ findProduct HOẶC ảnh AI tự tạo từ Pollinations
                     let thumbnailUrl = args.thumbnail_url || "";
+                    if (thumbnailUrl.includes("pollinations.ai")) {
+                        // URL encode để tránh lỗi ký tự tiếng Việt hoặc khoảng trắng làm vỡ ảnh
+                        thumbnailUrl = encodeURI(thumbnailUrl);
+                    }
 
                     // Robot Mode: Trả draftPayload về Frontend để hiển thị visual auto-fill
                     return { 
@@ -243,12 +347,12 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
             }
         };
 
-        const aiResult = await askGeminiAdmin(message, dashboardContext, chatHistory, permissionsContext, systemPermissionsContext, processOrderCallback);
+        const aiResult = await askGeminiAdmin(message, dashboardContext, chatHistory, permissionsContext, systemPermissionsContext, processOrderCallback, uploadedImages, documentContext);
 
         const replyText = typeof aiResult === 'string' ? aiResult : aiResult.text;
 
         // Lưu tin nhắn của AI
-        await AiMessageAdmin.create({ sessionId: "admin_session", sender: "ai", text: replyText });
+        await AiMessageAdmin.create({ sessionId: `admin_${userId}`, sender: "ai", text: replyText });
 
         res.status(200).json({
             code: 200,

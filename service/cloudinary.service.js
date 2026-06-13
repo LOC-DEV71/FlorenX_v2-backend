@@ -146,3 +146,19 @@ module.exports.streamUploadSetting = async (req, res, next) => {
     });
   }
 };
+
+module.exports.streamUploadBotAvatar = async (req, res, next) => {
+  try {
+    if (req.files?.botAvatar?.length) {
+      await configureCloudinary();
+      const result = await uploadStream(req.files.botAvatar[0]);
+      req.body.botAvatarUrl = result.secure_url;
+    }
+    next();
+  } catch (error) {
+    console.log("streamUploadBotAvatar error:", error);
+    return res.status(500).json({
+      message: "Upload bot avatar failed"
+    });
+  }
+};

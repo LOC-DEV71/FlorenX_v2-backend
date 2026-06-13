@@ -1,6 +1,9 @@
 const Order = require("../Models/order.model");
 const ProductStock = require("../Models/product-stock.models");
 const InventoryTransaction = require("../Models/InventoryTransaction.models");
+const ProductPreview = require("../Models/products.preview");
+const System = require("../Models/system.model");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Logic thực thi Đơn hàng tự động
 async function processOrderLogic(orderCode) {
@@ -105,7 +108,64 @@ async function processAllOrdersLogic() {
     }
 }
 
+// Logic tự động phản hồi đánh giá sản phẩm bằng AI
+async function processReviewLogic(reviewId, io) {
+    try {
+        const preview = await ProductPreview.findById(reviewId);
+        if (!preview) return { status: "error", message: "Không tìm thấy đánh giá" };
+
+        const systemConfig = await System.findOne({});
+        if (!systemConfig || !systemConfig.ai || !systemConfig.ai.apiKey) {
+             return { status: "error", message: "Chưa cấu hình API Key của AI" };
+        }
+
+        const aiModel = systemConfig.ai?.model || "gemini-1.5-flash";
+        const genAI = new GoogleGenerativeAI(systemConfig.ai.apiKey);
+        const model = genAI.getGenerativeModel({ model: aiModel });
+
+        const prompt = `Bạn là Veltrix AI, một trợ lý chăm sóc khách hàng chuyên nghiệp của cửa hàng Veltrix Gear (bán linh kiện, laptop, PC gaming).
+Khách hàng vừa để lại đánh giá cho sản phẩm của chúng ta với số điểm: ${preview.rating} sao.
+Tiêu đề đánh giá: "${preview.title || ''}"
+Nội dung đánh giá của khách hàng: "${preview.comment || 'Không có bình luận'}"
+
+Nhiệm vụ của bạn: Hãy viết MỘT đoạn phản hồi ngắn gọn (dưới 50 từ), lịch sự, tự nhiên và KHÔNG rập khuôn.
+- Nếu đánh giá từ 4-5 sao: Cảm ơn khách hàng đã ủng hộ và chúc họ có trải nghiệm tuyệt vời.
+- Nếu đánh giá từ 1-3 sao: Xin lỗi chân thành về trải nghiệm chưa tốt, giải thích nhẹ nhàng hoặc mời họ liên hệ qua mục Chat với AI/nhân viên để được hỗ trợ bảo hành hoặc đổi trả. Không bao giờ cãi lại khách hàng.
+Chỉ trả về nội dung câu trả lời, không có định dạng markdown phức tạp hay giải thích thêm.`;
+
+        const result = await model.generateContent(prompt);
+        let aiResponse = result.response.text().trim();
+
+        // Cập nhật review
+        const server_return = {
+            admin_name: "Veltrix AI",
+            role: "Trợ lý Hệ thống",
+            avatar: systemConfig.ai?.botAvatar || "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/1024px-ChatGPT_logo.svg.png",
+            comment: aiResponse,
+            createdAt: Date.now()
+        };
+
+        await ProductPreview.updateOne(
+            { _id: reviewId },
+            { server_return: server_return }
+        );
+
+        // Phát sự kiện để cập nhật UI Admin (nếu họ đang xem chi tiết sản phẩm đó)
+        if (io) {
+            io.emit("server_return_admin_product_preview", {
+                id: reviewId,
+                server_return: server_return
+            });
+        }
+
+        return { status: "success", message: "AI đã trả lời thành công" };
+    } catch (e) {
+        return { status: "error", message: `AI Error: ${e.message}` };
+    }
+}
+
 module.exports = {
     processOrderLogic,
-    processAllOrdersLogic
+    processAllOrdersLogic,
+    processReviewLogic
 };

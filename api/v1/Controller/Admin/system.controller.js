@@ -56,7 +56,18 @@ module.exports.getSystemConfig = async (req, res) => {
 // [PATCH] /api/v1/admin/system
 module.exports.updateSystemConfig = async (req, res) => {
   try {
-    const updateData = req.body;
+    // Khi FE gửi FormData (có file), data JSON nằm trong field "data"
+    let updateData = req.body;
+    if (typeof req.body.data === "string") {
+      try { updateData = JSON.parse(req.body.data); } catch (e) {}
+    }
+
+    // Nếu Cloudinary middleware đã upload được avatar, gán vào ai.botAvatar
+    if (req.body.botAvatarUrl) {
+      if (!updateData.ai) updateData.ai = {};
+      updateData.ai.botAvatar = req.body.botAvatarUrl;
+    }
+
     let system = await System.findOne({});
 
     if (!system) {

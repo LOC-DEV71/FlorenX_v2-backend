@@ -5,7 +5,8 @@ const Orders = require("../../Models/order.model");
 const jwtUtils = require("../../../../utils/jwt.utils");
 const Notifications = require("../../Models/notification.model");
 const Users = require("../../Models/user.models");
-
+const System = require("../../Models/system.model");
+const { processReviewLogic } = require("../../Helpers/ai.automation.helper");
 module.exports.commentProduct = async (req, res) => {
     try {
         const token_client = req.cookies.token_client;
@@ -63,6 +64,30 @@ module.exports.commentProduct = async (req, res) => {
         });
 
         await createNotifi.save();
+
+        await createNotifi.save();
+
+        // AI Auto-Pilot Trigger: Tự động trả lời đánh giá ngầm
+        const system = await System.findOne({});
+        if (system && system.ai && system.ai.autoProcessOrders === true) {
+            const io = req.app.get("io");
+            if (io) {
+                // Bắn Socket kích hoạt hiệu ứng Auto-Pilot trên UI Admin
+                io.emit("admin_auto_pilot_review_trigger", { 
+                    reviewId: createPreview._id, 
+                    slug: product.slug, 
+                    rating: createPreview.rating, 
+                    comment: createPreview.comment 
+                });
+            }
+
+            // Chạy bất đồng bộ để AI tự sinh câu trả lời và lưu vào db
+            processReviewLogic(createPreview._id, io).then(res => {
+                console.log(`[AI Auto-Pilot] Processed Review ${createPreview._id}:`, res);
+            }).catch(err => {
+                console.error(`[AI Auto-Pilot] Error on Review ${createPreview._id}:`, err);
+            });
+        }
 
         return res.status(200).json({
             message: "Đánh giá thành công",

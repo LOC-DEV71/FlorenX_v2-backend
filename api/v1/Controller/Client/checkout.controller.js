@@ -206,6 +206,12 @@ module.exports.order = async (req, res) => {
     // AI Auto-Pilot Trigger: Xử lý duyệt đơn tự động ngầm
     const system = await System.findOne({});
     if (system && system.ai && system.ai.autoProcessOrders === true) {
+      // Bắn Socket kích hoạt hiệu ứng Auto-Pilot trên UI Admin
+      const io = req.app.get("io");
+      if (io) {
+        io.emit("admin_auto_pilot_trigger", { orderCode: createOrder.code });
+      }
+
       // Chạy bất đồng bộ, không cần await để khách hàng nhận được phản hồi ngay
       processOrderLogic(createOrder.code).then(res => {
         console.log(`[AI Auto-Pilot] Processed ${createOrder.code}:`, res);

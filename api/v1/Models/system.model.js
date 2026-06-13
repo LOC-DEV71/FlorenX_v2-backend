@@ -25,7 +25,8 @@ const systemSchema = new mongoose.Schema(
       prompt: { type: String, default: 'Tên bạn là Veltrix-chan, trợ lý ảo của cửa hàng FlorenX. Hãy trả lời khách hàng một cách thân thiện, nhiệt tình, sử dụng emoji dễ thương và luôn tư vấn chốt đơn nhanh nhất.' },
       requestsToday: { type: Number, default: 0 },
       lastResetDate: { type: Date, default: Date.now },
-      autoProcessOrders: { type: Boolean, default: false } // Bật/tắt duyệt đơn tự động
+      autoProcessOrders: { type: Boolean, default: false }, // Bật/tắt duyệt đơn tự động
+      botAvatar: { type: String, default: '' } // Avatar hiển thị khi AI trả lời đánh giá
     },
     
     // Danh sách các Model AI có thể sử dụng
