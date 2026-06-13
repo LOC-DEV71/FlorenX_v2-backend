@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const controller = require("../../Controller/Admin/system.controller");
-const middleware = require("../../Middleware/admin/permission.middleware");
+const middleware = require("../../Middleware/Admin/permission.middleware");
 
 router.get("/", middleware.permissionMiddleWare("system_management"), controller.getSystemConfig);
 router.patch("/", middleware.permissionMiddleWare("system_management"), controller.updateSystemConfig);

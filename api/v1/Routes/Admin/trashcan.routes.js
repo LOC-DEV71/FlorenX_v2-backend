@@ -3,7 +3,7 @@ const router = express.Router();
 
 const controller = require("../../Controller/Admin/trashcan.controller");
 // const roleValidate = require("../../Validate/Admin/role.validate");
-const middleware = require("../../Middleware/admin/permission.middleware");
+const middleware = require("../../Middleware/Admin/permission.middleware");
 
 router.get("/", middleware.permissionMiddleWare("trash_management"), controller.index);
 

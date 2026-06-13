@@ -5,7 +5,7 @@ const multer = require("multer");
 const upload = multer({ storage: multer.memoryStorage() });
 const cloudinary = require("../../../../service/cloudinary.service");
 
-const middleware = require("../../Middleware/admin/permission.middleware");
+const middleware = require("../../Middleware/Admin/permission.middleware");
 
 router.get("/detail", middleware.permissionMiddleWare("setting_management"), controller.detail);
 
