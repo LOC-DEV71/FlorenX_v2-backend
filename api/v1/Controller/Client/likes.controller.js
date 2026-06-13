@@ -10,7 +10,7 @@ module.exports.addLike = async (req, res) => {
         const token_client = req.cookies.token_client;
         let user = null;
         if(token_client){
-            const dedcode = jwtUtils.verifyToken(token_client);
+            const dedcode = await jwtUtils.verifyToken(token_client);
             user = await Users.findOne({_id: dedcode.id})
         }
         switch (type) {
@@ -45,7 +45,7 @@ module.exports.getLike = async (req, res) => {
         const token_client = req.cookies.token_client;
         let user = null;
         if(token_client){
-            const dedcode = jwtUtils.verifyToken(token_client);
+            const dedcode = await jwtUtils.verifyToken(token_client);
             user = await Users.findOne({_id: dedcode.id})
         }
 
@@ -73,7 +73,7 @@ module.exports.getListLikeProducts = async (req, res) => {
             return res.status(401).json({ code: false, message: "Chưa đăng nhập" });
         }
 
-        const decoded = jwtUtils.verifyToken(token_client);
+        const decoded = await jwtUtils.verifyToken(token_client);
         const user = await Users.findOne({ _id: decoded.id }).lean().select("_id");
 
         if (!user) {

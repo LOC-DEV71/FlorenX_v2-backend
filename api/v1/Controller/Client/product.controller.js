@@ -210,7 +210,7 @@ module.exports.getCrossSellProducts = async (req, res) => {
             return res.status(400).json({ code: false, message: "Không tìm thấy giỏ hàng trong cookie" });
         }
 
-        const decode = jwt.verifyToken(tokenCart);
+        const decode = await jwt.verifyToken(tokenCart);
         if (!decode || !decode.id) {
             return res.status(400).json({ code: false, message: "Token giỏ hàng không hợp lệ" });
         }

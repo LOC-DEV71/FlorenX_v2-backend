@@ -9,7 +9,7 @@ const Users = require("../../Models/user.models");
 module.exports.commentProduct = async (req, res) => {
     try {
         const token_client = req.cookies.token_client;
-        const decode = jwtUtils.verifyToken(token_client);
+        const decode = await jwtUtils.verifyToken(token_client);
 
         const user = await Users.findById(decode.id).select("fullname");
         if (!user) {
@@ -107,7 +107,7 @@ module.exports.getList = async (req, res) => {
 module.exports.getProductPreview = async (req, res) => {
     try {
         const token_client = req.cookies.token_client;
-        const decode = jwtUtils.verifyToken(token_client);
+        const decode = await jwtUtils.verifyToken(token_client);
 
         const orders = await Orders.find({ email: decode.email, status: "done" })
         const list = orders.map(item => item.products).flat();

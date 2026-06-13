@@ -11,7 +11,7 @@ module.exports.permissionMiddleWare =  (permission) =>{
                     code: false
                 })
             }
-            const {id, role} = jwtUtils.verifyToken(token);
+            const {id, role} = await jwtUtils.verifyToken(token);
             const exitAccount = await Account.findOne({
                 _id: id,
                 role_slug: role

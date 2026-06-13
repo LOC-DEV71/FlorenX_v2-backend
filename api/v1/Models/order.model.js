@@ -17,7 +17,7 @@ const orderSchema = new mongoose.Schema(
 
     pay: {
       type: String,
-      enum: ["cod", "paypal"],
+      enum: ["cod", "paypal", "bank"],
       default: "cod"
     },
 

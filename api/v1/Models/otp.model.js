@@ -11,7 +11,7 @@ const otpSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["register", "forgot"],
+    enum: ["register", "forgot", "view_secret"],
     required: true
   },
   expireAt: {

@@ -7,23 +7,31 @@ const OrderCode = require("../../../../helper/generalOtp");
 const formSendMail = require("../../../../helper/formSendMail");
 const jwtHelper = require("../../../../utils/jwt.utils");
 const Notification = require("../../Models/notification.model");
+const System = require("../../Models/system.model");
 
-
-const environment = new paypal.core.SandboxEnvironment(
-  process.env.PAY_PAL_ID,
-  process.env.PAY_PAL_SECRET
-);
-const client = new paypal.core.PayPalHttpClient(environment);
+const getPayPalClient = async () => {
+  const system = await System.findOne({});
+  if (system?.payment && !system.payment.paypalStatus) {
+    throw new Error("Cổng thanh toán PayPal hiện đang bảo trì hoặc bị tắt.");
+  }
+  const clientId = system?.payment?.paypalClientId || process.env.PAY_PAL_ID;
+  const clientSecret = system?.payment?.paypalClientSecret || process.env.PAY_PAL_SECRET;
+  
+  const environment = new paypal.core.SandboxEnvironment(clientId, clientSecret);
+  return new paypal.core.PayPalHttpClient(environment);
+};
 
 const createOrder = async (req, res) => {
-  const { amount } = req.body;
-  const request = new paypal.orders.OrdersCreateRequest();
-  request.prefer("return=representation");
-  request.requestBody({
-    intent: "CAPTURE",
-    purchase_units: [{ amount: { currency_code: "USD", value: amount } }]
-  });
   try {
+    const client = await getPayPalClient();
+    const { amount } = req.body;
+    const request = new paypal.orders.OrdersCreateRequest();
+    request.prefer("return=representation");
+    request.requestBody({
+      intent: "CAPTURE",
+      purchase_units: [{ amount: { currency_code: "USD", value: amount } }]
+    });
+
     const order = await client.execute(request);
     res.json({ orderID: order.result.id });
   } catch (err) {
@@ -32,10 +40,12 @@ const createOrder = async (req, res) => {
 };
 
 const captureOrder = async (req, res) => {
-  const { orderID } = req.body;
-  const request = new paypal.orders.OrdersCaptureRequest(orderID);
-  request.requestBody({});
   try {
+    const client = await getPayPalClient();
+    const { orderID } = req.body;
+    const request = new paypal.orders.OrdersCaptureRequest(orderID);
+    request.requestBody({});
+
     const capture = await client.execute(request);
     res.json({ status: capture.result.status });
   } catch (err) {
@@ -43,7 +53,23 @@ const captureOrder = async (req, res) => {
   }
 };
 
-module.exports = { createOrder, captureOrder };
+module.exports.getPaymentConfig = async (req, res) => {
+  try {
+    const system = await System.findOne({});
+    const activeBanks = system?.banks?.filter(b => b.status) || [];
+    res.json({
+      code: 200,
+      banks: activeBanks,
+      bankTransferStatus: system?.payment?.bankTransferStatus ?? true,
+      paypalStatus: system?.payment?.paypalStatus ?? true
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+module.exports.createOrder = createOrder;
+module.exports.captureOrder = captureOrder;
 
 module.exports.order = async (req, res) => {
   try {
@@ -198,7 +224,7 @@ module.exports.order = async (req, res) => {
 module.exports.getDetailOrder = async (req, res) => {
   try {
     const token_client = req.cookies.token_client;
-    const dedcode = jwtHelper.verifyToken(token_client);
+    const dedcode = await jwtHelper.verifyToken(token_client);
     const user = await Users.findOne({
       _id: dedcode.id
     }).select("-password -_id")

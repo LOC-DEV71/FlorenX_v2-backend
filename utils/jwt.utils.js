@@ -1,14 +1,21 @@
 const jwt = require("jsonwebtoken");
+const System = require("../api/v1/Models/system.model");
 
-const createToken = (payload, expires = "7d") => {
-  return jwt.sign(payload, process.env.JWT_SECRET, {
+const createToken = async (payload) => {
+  const system = await System.findOne({});
+  const secret = system?.iam?.jwtSecret || "FlorenxSecretKey2026_lamchiloc712005_25251325";
+  const expires = `${system?.iam?.jwtExpiresIn || 7}d`;
+
+  return jwt.sign(payload, secret, {
     expiresIn: expires
   });
 };
 
-const verifyToken = (token) => {
+const verifyToken = async (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    const system = await System.findOne({});
+    const secret = system?.iam?.jwtSecret || "FlorenxSecretKey2026_lamchiloc712005_25251325";
+    return jwt.verify(token, secret);
   } catch (error) {
     return null;
   }

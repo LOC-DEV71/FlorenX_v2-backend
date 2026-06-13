@@ -76,7 +76,7 @@ module.exports.chat = async (req, res) => {
         try {
             const token_client = req.cookies?.token_client;
             if (token_client) {
-                const decode = jwtHelper.verifyToken(token_client);
+                const decode = await jwtHelper.verifyToken(token_client);
                 const user = await Users.findOne({ _id: decode.id }).select("email");
                 if (user) {
                     const orders = await Orders.find({ email: user.email }).sort({ createdAt: -1 }).limit(5);

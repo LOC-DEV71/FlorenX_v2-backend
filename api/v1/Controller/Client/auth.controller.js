@@ -8,8 +8,7 @@ const GeneralOtp = require("../../../../helper/generalOtp");
 const formSendMail = require("../../../../helper/formSendMail");
 const Otp = require("../../Models/otp.model");
 const bcrypt = require("bcryptjs");
-
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const System = require("../../Models/system.model");
 
 // --- HELPER FUNCTION: TẠO ROOM CHAT ---
 const handleCreateRoom = async (userId) => {
@@ -35,9 +34,21 @@ module.exports.googleLogin = async (req, res) => {
       return res.json({ ok: false, data: "Token không hợp lệ" });
     }
 
+    const systemConfig = await System.findOne({});
+    const googleClientId = systemConfig?.iam?.googleClientId;
+    const googleStatus = systemConfig?.iam?.googleStatus;
+    const jwtExpiresInDays = systemConfig?.iam?.jwtExpiresIn || 7;
+    const maxAgeMs = jwtExpiresInDays * 24 * 60 * 60 * 1000;
+
+    if (!googleStatus || !googleClientId) {
+      return res.json({ ok: false, data: "Tính năng đăng nhập bằng Google hiện đang bị tắt hoặc chưa được cấu hình." });
+    }
+
+    const client = new OAuth2Client(googleClientId);
+
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: googleClientId,
     });
 
     const payload = ticket.getPayload();
@@ -70,7 +81,7 @@ module.exports.googleLogin = async (req, res) => {
       await handleCreateRoom(user._id);
     }
 
-    const tokenSystem = jwtHelper.createToken({
+    const tokenSystem = await jwtHelper.createToken({
       id: user._id,
       email: user.email,
       type: "login",
@@ -81,7 +92,7 @@ module.exports.googleLogin = async (req, res) => {
     let guestCart = null;
 
     if (cartToken) {
-      const decodedCart = jwtHelper.verifyToken(cartToken);
+      const decodedCart = await jwtHelper.verifyToken(cartToken);
       if (decodedCart?.id && decodedCart.type === "cart") {
         guestCart = await Cart.findById(decodedCart.id);
       }
@@ -129,14 +140,14 @@ module.exports.googleLogin = async (req, res) => {
     }
 
     // 5. Set cookies
-    const tokenCart = jwtHelper.createToken({ id: userCart._id, type: "cart" });
+    const tokenCart = await jwtHelper.createToken({ id: userCart._id, type: "cart" });
 
     res.cookie("cart", tokenCart, {
-      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: maxAgeMs
     });
 
     res.cookie("token_client", tokenSystem, {
-      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: maxAgeMs
     });
 
     return res.json({ ok: true, data: user });
@@ -160,17 +171,20 @@ module.exports.logLocal = async (req, res) => {
       return res.status(400).json({ message: "Mật khẩu không chính xác", code: false });
     }
 
-    const tokenSystem = jwtHelper.createToken({ id: user._id, email: user.email, type: "login" });
+    const tokenSystem = await jwtHelper.createToken({ id: user._id, email: user.email, type: "login" });
+
+    const systemConfig = await System.findOne({});
+    const maxAgeMs = (systemConfig?.iam?.jwtExpiresIn || 7) * 24 * 60 * 60 * 1000;
 
     res.cookie("token_client", tokenSystem, {
-      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: maxAgeMs
     });
 
     // --- LOGIC CART GIỮ NGUYÊN ---
     const cartToken = req.cookies.cart;
     let guestCart = null;
     if (cartToken) {
-      const decodedCart = jwtHelper.verifyToken(cartToken);
+      const decodedCart = await jwtHelper.verifyToken(cartToken);
       if (decodedCart?.id && decodedCart.type === "cart") {
         guestCart = await Cart.findById(decodedCart.id);
       }
@@ -195,9 +209,9 @@ module.exports.logLocal = async (req, res) => {
     }
     if (!userCart) { userCart = await Cart.create({ user_id: user._id, products: [] }); }
 
-    const tokenCart = jwtHelper.createToken({ id: userCart._id, type: "cart" });
+    const tokenCart = await jwtHelper.createToken({ id: userCart._id, type: "cart" });
     res.cookie("cart", tokenCart, {
-      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: maxAgeMs
     });
 
     return res.json({ code: true, message: "Đăng nhập thành công" });
@@ -209,7 +223,7 @@ module.exports.logLocal = async (req, res) => {
 module.exports.getMe = async (req, res) => {
   try {
     const token_client = req.cookies.token_client;
-    const decode = jwtHelper.verifyToken(token_client);
+    const decode = await jwtHelper.verifyToken(token_client);
     
     // Tìm user và chuyển sang object thuần (lean) để dễ thêm field
     const user = await Users.findOne({ _id: decode.id }).select("-password").lean();
@@ -247,7 +261,7 @@ module.exports.logout = async (req, res) => {
 module.exports.update = async (req, res) => {
   try {
     const token_client = req.cookies.token_client;
-    const decode = jwtHelper.verifyToken(token_client);
+    const decode = await jwtHelper.verifyToken(token_client);
     const exitUser = await Users.findOne({_id: decode.id});
     if(!exitUser){
       return res.status(400).json({ message: `Token không hợp lệ` });
@@ -296,10 +310,13 @@ module.exports.confirm = async (req, res) => {
 
     await Otp.deleteOne({ _id: existOtp._id });
 
-    const tokenSystem = jwtHelper.createToken({ id: user._id, type: "login" });
+    const tokenSystem = await jwtHelper.createToken({ id: user._id, type: "login" });
+
+    const systemConfig = await System.findOne({});
+    const maxAgeMs = (systemConfig?.iam?.jwtExpiresIn || 7) * 24 * 60 * 60 * 1000;
 
     res.cookie("token_client", tokenSystem, {
-      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: maxAgeMs
     });
 
     return res.status(200).json({ message: "Xác thực OTP và đăng nhập thành công", code: true });
@@ -340,10 +357,13 @@ module.exports.forgotPasswordOtp = async (req, res) => {
     if(!existOtp) return res.status(400).json({ code: false, message: "Mã OTP không chính xác" });
 
     const user = await Users.findOne({ email });
-    const tokenSystem = jwtHelper.createToken({ id: user._id, type: "login" });
+    const tokenSystem = await jwtHelper.createToken({ id: user._id, type: "login" });
+
+    const systemConfig = await System.findOne({});
+    const maxAgeMs = (systemConfig?.iam?.jwtExpiresIn || 7) * 24 * 60 * 60 * 1000;
 
     res.cookie("token_client", tokenSystem, {
-      httpOnly: true, secure: true, sameSite: "none", maxAge: 7 * 24 * 60 * 60 * 1000
+      httpOnly: true, secure: true, sameSite: "none", maxAge: maxAgeMs
     });
     
     return res.status(200).json({ message: "Xác thực thành công", code: true });
@@ -358,7 +378,7 @@ module.exports.resetPassword = async (req, res) => {
     const tokenClient = req.cookies.token_client;
     if(!tokenClient) return res.status(400).json({ message: "Token không hợp lệ" });
 
-    const decode = jwtHelper.verifyToken(tokenClient);
+    const decode = await jwtHelper.verifyToken(tokenClient);
     const user = await Users.findById(decode.id);
     if(!user) return res.status(400).json({ message: "Không tìm thấy tài khoản." });
 

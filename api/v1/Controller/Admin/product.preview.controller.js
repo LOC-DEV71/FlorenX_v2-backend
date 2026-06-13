@@ -57,7 +57,7 @@ module.exports.serverReturnReview = async (req, res) => {
                 message: "Lỗi không có token"
             })
         }
-        const decode = jwtUtils.verifyToken(token);
+        const decode = await jwtUtils.verifyToken(token);
         if(!decode){
             return res.status(400).json({
                 code: false,

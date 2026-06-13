@@ -24,7 +24,7 @@ module.exports.addToCart = async (req, res) => {
 
     // 1. Ưu tiên tìm cart theo cookie cart
     if (cartToken) {
-      const decodedCart = jwtUtils.verifyToken(cartToken);
+      const decodedCart = await jwtUtils.verifyToken(cartToken);
 
       // Check đúng token cart mới lấy
       if (decodedCart?.id && decodedCart.type === "cart") {
@@ -38,7 +38,7 @@ module.exports.addToCart = async (req, res) => {
       let user = null;
 
       if (clientToken) {
-        const decodedUser = jwtUtils.verifyToken(clientToken);
+        const decodedUser = await jwtUtils.verifyToken(clientToken);
 
         // Check đúng token login mới lấy user
         if (decodedUser?.id && decodedUser.type === "login") {
@@ -63,7 +63,7 @@ module.exports.addToCart = async (req, res) => {
 
     // 5. Tạo lại token cart và lưu vào cookie
     // để những lần sau client luôn mang đúng cart hiện tại
-    const tokenCart = jwtUtils.createToken({
+    const tokenCart = await jwtUtils.createToken({
       id: cartDoc._id,
       type: "cart"
     });
@@ -122,7 +122,7 @@ module.exports.addToCart = async (req, res) => {
 module.exports.getCart = async (req, res) => {
   try {
     const tokenCart = req.cookies.cart;
-    const dedcode = jwtUtils.verifyToken(tokenCart);
+    const dedcode = await jwtUtils.verifyToken(tokenCart);
 
     let cart = null;
 
@@ -181,7 +181,7 @@ module.exports.updateQuantity = async (req, res) => {
       });
     }
 
-    const decoded = jwtUtils.verifyToken(tokenCart);
+    const decoded = await jwtUtils.verifyToken(tokenCart);
 
     if (!decoded) {
       return res.status(401).json({

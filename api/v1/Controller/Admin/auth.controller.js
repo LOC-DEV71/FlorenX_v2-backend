@@ -25,7 +25,7 @@ module.exports.login = async (req, res) => {
             })
         }
 
-        const token = jwtUtils.createToken({
+        const token = await jwtUtils.createToken({
             id: exitEmail._id,
             role: exitEmail.role_slug
         })
@@ -64,7 +64,7 @@ module.exports.logout = async (req, res) => {
 module.exports.getAdmin = async (req, res) => {
     try {
         const token = req.cookies.token;
-        const dedcode = jwtUtils.verifyToken(token);
+        const dedcode = await jwtUtils.verifyToken(token);
         
         const admin = await Account.findOne({
             _id: dedcode.id,

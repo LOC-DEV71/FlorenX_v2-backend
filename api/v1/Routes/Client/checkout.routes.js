@@ -3,6 +3,7 @@ const router = express.Router();
 const controller = require("../../Controller/Client/checkout.controller");
 const validate = require("../../Validate/client/order.validate");
 
+router.get("/payment-config", controller.getPaymentConfig);
 router.post("/paypal/create-order", controller.createOrder);
 router.post("/paypal/capture-order", controller.captureOrder);
 router.post("/order", validate.orderValidate, controller.order);

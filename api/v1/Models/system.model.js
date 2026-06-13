@@ -43,6 +43,32 @@ const systemSchema = new mongoose.Schema(
       senderName: { type: String, default: 'FlorenX System' }
     },
     
+    // Định danh & Truy cập (IAM)
+    iam: {
+      googleStatus: { type: Boolean, default: true },
+      googleClientId: { type: String, default: '' },
+      jwtExpiresIn: { type: Number, default: 7 },
+      jwtSecret: { type: String, default: 'FlorenxSecretKey2026' },
+      pwdMinLength: { type: Number, default: 8 },
+      pwdRequireSpecial: { type: Boolean, default: true }
+    },
+    
+    // Đa phương tiện (Media)
+    media: {
+      cloudinaryStatus: { type: Boolean, default: true },
+      cloudinaryCloudName: { type: String, default: '' },
+      cloudinaryApiKey: { type: String, default: '' },
+      cloudinaryApiSecret: { type: String, default: '' }
+    },
+    
+    // Cổng Thanh Toán (Payment)
+    payment: {
+      paypalStatus: { type: Boolean, default: true },
+      paypalClientId: { type: String, default: '' },
+      paypalClientSecret: { type: String, default: '' },
+      bankTransferStatus: { type: Boolean, default: true }
+    },
+    
     // Chính sách & Thuế
     policy: {
       vatEnabled: { type: Boolean, default: false },

@@ -1,11 +1,19 @@
 const cloudinary = require("cloudinary").v2;
 const streamifier = require("streamifier");
+const System = require("../api/v1/Models/system.model");
 
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.CLOUD_KEY,
-  api_secret: process.env.CLOUD_SECRET
-});
+const configureCloudinary = async () => {
+  const system = await System.findOne({});
+  if (system?.media && !system.media.cloudinaryStatus) {
+    throw new Error("Tính năng lưu trữ Cloudinary hiện đang bị tắt.");
+  }
+   
+  cloudinary.config({
+    cloud_name: system?.media?.cloudinaryCloudName || process.env.CLOUD_NAME,
+    api_key: system?.media?.cloudinaryApiKey || process.env.CLOUD_KEY,
+    api_secret: system?.media?.cloudinaryApiSecret || process.env.CLOUD_SECRET
+  });
+};
 
 const uploadStream = (file) => {
   return new Promise((resolve, reject) => {
@@ -20,6 +28,7 @@ const uploadStream = (file) => {
 
 module.exports.streamUpload = async (req, res, next) => {
   try {
+    await configureCloudinary();
     if (req.files?.thumbnail?.length) {
       const result = await uploadStream(req.files.thumbnail[0]);
       req.body.thumbnail = result.secure_url;
@@ -42,6 +51,7 @@ module.exports.streamUpload = async (req, res, next) => {
 
 module.exports.streamUploadAvatar = async (req, res, next) => {
   try {
+    await configureCloudinary();
     if (req.files?.avatar?.length) {
       const result = await uploadStream(req.files.avatar[0]);
       req.body.avatar = result.secure_url;
@@ -57,6 +67,7 @@ module.exports.streamUploadAvatar = async (req, res, next) => {
 
 module.exports.streamUploadSetting = async (req, res, next) => {
   try {
+    await configureCloudinary();
     if (req.files?.logo?.length) {
       const result = await uploadStream(req.files.logo[0]);
       req.body.logo = result.secure_url;

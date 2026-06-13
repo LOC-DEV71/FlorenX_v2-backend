@@ -1,27 +1,36 @@
 const nodemailer = require('nodemailer');
+const System = require("../api/v1/Models/system.model");
 
-module.exports.sendMail = (email, subject, html) => {
-    const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: process.env.MAIL_USER,
-            pass: process.env.MAIL_PASS
+module.exports.sendMail = async (email, subject, html) => {
+    try {
+        const systemConfig = await System.findOne({});
+        const emailConfig = systemConfig?.email;
+
+        if (!emailConfig || !emailConfig.smtpEmail || !emailConfig.smtpPassword) {
+            console.log("Error: SMTP Email is not configured in System Settings.");
+            return false;
         }
-    });
 
-    const mailOptions = {
-        from: process.env.MAIL_USER,
-        to: email,
-        subject: subject,
-        html: html
-    };
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: emailConfig.smtpEmail,
+                pass: emailConfig.smtpPassword
+            }
+        });
 
-    transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-            console.log("Error:", error);
-        } else {
-            console.log('Email sent:', info.response);
-        }
-    });
+        const mailOptions = {
+            from: `"${emailConfig.senderName || 'FlorenX System'}" <${emailConfig.smtpEmail}>`,
+            to: email,
+            subject: subject,
+            html: html
+        };
 
+        const info = await transporter.sendMail(mailOptions);
+        console.log('Email sent:', info.response);
+        return true;
+    } catch (error) {
+        console.log("Error sending email:", error);
+        return false;
+    }
 }
