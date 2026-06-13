@@ -21,7 +21,10 @@ const usersRoutes = require("./users.routes.js")
 const notificationsRoutes = require("./notifications.routes.js")
 const productPreviewRoutes = require("./product.preview.routes.js")
 const systemRoutes = require("./system.routes.js")
+const dashboardRoutes = require("./dashboard.routes.js");
+const aiRoutes = require("./ai.routes.js");
 
+router.use("/dashboard", dashboardRoutes);
 router.use("/products", productRoutes);
 router.use("/product-categories", productCategoriesRoutes);
 router.use("/roles", rolesRoutes);
@@ -42,5 +45,6 @@ router.use("/users", usersRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/product-preview", productPreviewRoutes);
 router.use("/system", systemRoutes);
+router.use("/ai", aiRoutes);
 
 module.exports = router;

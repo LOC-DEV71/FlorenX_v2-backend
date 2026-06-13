@@ -8,6 +8,7 @@ const formSendMail = require("../../../../helper/formSendMail");
 const jwtHelper = require("../../../../utils/jwt.utils");
 const Notification = require("../../Models/notification.model");
 const System = require("../../Models/system.model");
+const { processOrderLogic } = require("../../Helpers/ai.automation.helper");
 
 const getPayPalClient = async () => {
   const system = await System.findOne({});
@@ -202,8 +203,16 @@ module.exports.order = async (req, res) => {
       { $set: { products: [] } }
     )
 
-
-
+    // AI Auto-Pilot Trigger: Xử lý duyệt đơn tự động ngầm
+    const system = await System.findOne({});
+    if (system && system.ai && system.ai.autoProcessOrders === true) {
+      // Chạy bất đồng bộ, không cần await để khách hàng nhận được phản hồi ngay
+      processOrderLogic(createOrder.code).then(res => {
+        console.log(`[AI Auto-Pilot] Processed ${createOrder.code}:`, res);
+      }).catch(err => {
+        console.error(`[AI Auto-Pilot] Error on ${createOrder.code}:`, err);
+      });
+    }
 
     res.status(200).json({
       code: true,

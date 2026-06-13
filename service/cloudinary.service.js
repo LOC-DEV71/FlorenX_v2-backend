@@ -26,6 +26,34 @@ const uploadStream = (file) => {
   });
 };
 
+module.exports.uploadRawStream = async (buffer) => {
+  await configureCloudinary();
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { resource_type: "raw", public_id: `bao-cao-he-thong-${Date.now()}.pdf` },
+      (error, result) => {
+        if (result) resolve(result);
+        else reject(error);
+      }
+    );
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
+};
+
+module.exports.uploadImageBuffer = async (buffer) => {
+  await configureCloudinary();
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { resource_type: "image", folder: "articles", public_id: `article-thumbnail-${Date.now()}` },
+      (error, result) => {
+        if (result) resolve(result);
+        else reject(error);
+      }
+    );
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
+};
+
 module.exports.streamUpload = async (req, res, next) => {
   try {
     await configureCloudinary();

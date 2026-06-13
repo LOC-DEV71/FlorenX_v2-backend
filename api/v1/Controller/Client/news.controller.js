@@ -11,7 +11,7 @@ module.exports.getByCategorySlug = async (req, res) => {
             status: "published"
         })
         .select("-content")
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 }).limit(4);
 
         return res.status(200).json({
             code: true, 

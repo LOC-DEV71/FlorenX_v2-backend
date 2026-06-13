@@ -4,7 +4,7 @@ const System = require("../Models/system.model");
 // Hàm tạo Prompt cho AI
 const generatePrompt = (userMessage, categoriesContext, productsContext, chatHistory, ordersContext, customPrompt) => {
     // SYSTEM PROMPT - Xây dựng "Nhân cách" cho AI
-const systemPrompt = `
+    const systemPrompt = `
 ${customPrompt || `Bạn là "Veltrix-chan" 💖 — cô trợ lý AI đáng yêu, năng động và mê công nghệ của Veltrix Gear.
 
 TÍNH CÁCH:
@@ -72,6 +72,12 @@ LƯU Ý QUAN TRỌNG (HƯỚNG DẪN HỆ THỐNG):
 8. Nếu khách hỏi cửa hàng có bán những món đồ gì (Danh mục sản phẩm):
 - Hãy đọc [CÁC DANH MỤC SẢN PHẨM HIỆN CÓ] và trả lời thật tự hào về sự đa dạng của Veltrix Gear.
 
+9. HƯỚNG DẪN SỬ DỤNG WEBSITE (LUỒNG FRONTEND):
+- Khách muốn tìm đồ: Hướng dẫn khách bấm vào tab "Sản Phẩm" trên thanh menu hoặc dùng thanh Tìm kiếm.
+- Khách muốn mua hàng: Khuyên khách chọn sản phẩm, bấm "Thêm vào giỏ", sau đó bấm biểu tượng "Giỏ hàng" (góc phải trên) để tiến hành Thanh toán.
+- Thanh toán: Nhắc khách là web có hỗ trợ Ship COD, thanh toán MoMo và ZaloPay đầy đủ.
+- Tra cứu đơn & Đổi thông tin: Hướng dẫn khách bấm vào biểu tượng "Tài khoản" ở góc phải trên, chọn "Đơn hàng" để theo dõi hoặc "Thông tin cá nhân" để đổi mật khẩu.
+
 [CÁC DANH MỤC SẢN PHẨM HIỆN CÓ]
 ${categoriesContext}
 
@@ -128,9 +134,9 @@ module.exports.askGemini = async (userMessage, categoriesContext = "", productsC
         const aiModelsList = systemConfig.aiModels || [];
         const selectedModelConfig = aiModelsList.find(m => m.code === aiModel);
         const actualLimit = selectedModelConfig?.dailyLimit || 20;
-        
+
         const requestsToday = systemConfig.ai?.requestsToday || 0;
-        
+
         if (requestsToday >= actualLimit) {
             return "Huhu Veltrix-chan đã xài hết năng lượng (Quota) ngày hôm nay rồi... 🥺 Cậu vui lòng chat lại vào ngày mai hoặc nhắn trực tiếp cho nhân viên nhé! 💖";
         }
@@ -144,7 +150,7 @@ module.exports.askGemini = async (userMessage, categoriesContext = "", productsC
         // Gọi API lên Google
         const result = await model.generateContent(finalPrompt);
         const response = await result.response;
-        
+
         // Tăng số lượng request đã dùng
         await System.updateOne({ _id: systemConfig._id }, { $inc: { "ai.requestsToday": 1 } });
 
