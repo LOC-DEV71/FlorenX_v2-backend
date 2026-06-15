@@ -25,6 +25,10 @@ router.get("/:id",
     middleware.permissionMiddleWare("view_accounts"),
     controller.getAccountById
 );
+router.get("/:id/activity-logs", 
+    middleware.permissionMiddleWare("view_accounts"),
+    controller.getActivityLogs
+);
 router.post(
     "/change-multi", 
     middleware.permissionMiddleWare("update_accounts"),

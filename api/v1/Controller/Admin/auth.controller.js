@@ -16,6 +16,13 @@ module.exports.login = async (req, res) => {
                 code: false
             })
         }
+
+        if (exitEmail.status === "inactive") {
+            return res.status(403).json({
+                message: "Tài khoản của bạn đã bị khóa hoặc vô hiệu hóa",
+                code: false
+            })
+        }
         const isMatch = await bcrypt.compare(password, exitEmail.password);
 
         if(!isMatch){
@@ -69,7 +76,14 @@ module.exports.getAdmin = async (req, res) => {
         const admin = await Account.findOne({
             _id: dedcode.id,
             deleted: false
-        }).select("-password -_id")
+        }).select("-password")
+
+        if (!admin || admin.status === "inactive") {
+            return res.status(403).json({
+                message: "Tài khoản không tồn tại hoặc đã bị khóa",
+                code: false
+            })
+        }
 
         const role = await Roles.findOne({
             slug: admin?.role_slug

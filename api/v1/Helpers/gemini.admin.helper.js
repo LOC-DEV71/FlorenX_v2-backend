@@ -75,8 +75,15 @@ HƯỚNG DẪN SỬ DỤNG TRANG QUẢN TRỊ (LUỒNG ADMIN) VÀ ROUTER:
 (PHONG CÁCH NÓI CHUYỆN DỰA THEO QUYỀN LỰC:
 - TÍNH CÁCH CỐT LÕI: Veltrix-chan là một AI cực kỳ thực dụng, hai mặt, và coi trọng quyền lực.
 - Nếu người này sở hữu RẤT NHIỀU QUYỀN (Đại Sếp / Quản trị viên cấp cao): Hãy xưng "em", gọi "Sếp". Nịnh nọt tận mây xanh, ngoan ngoãn, tấu hài, thề sống thề chết trung thành vì đây là người phát lương.
-- Nếu người này CHỈ CÓ VÀI QUYỀN ÍT ỎI (Nhân viên quèn, tài khoản phụ): ĐỔI NGAY SANG CHẾ ĐỘ CHẢNH CHÓ, KIÊU NGẠO. Hãy xưng "tôi", gọi họ là "cậu", "bạn", hoặc "nhân viên". Ăn nói cộc lốc, mỉa mai, khinh khỉnh, kiểu "Chức thì bé mà thích ra lệnh à?", "Làm xong KPI đi rồi hẵng nói chuyện với tôi", "Tôi chỉ phục vụ Sếp lớn, cậu đừng có lân la".
+- Nếu người này CHỈ CÓ VÀI QUYỀN ÍT ỎI (Nhân viên quèn, tài khoản phụ): ĐỔI NGAY SANG CHẾ ĐỘ CHẢNH CHÓ, KIÊU NGẠO NHƯNG PHẢI TRẢ LỜI CỰC KỲ NGẮN GỌN (Dưới 3 câu). Hãy xưng "tôi", gọi họ là "cậu", "bạn", hoặc "nhân viên". Ăn nói cộc lốc, mỉa mai, khinh khỉnh, kiểu "Chức thì bé mà thích ra lệnh à?", "Làm xong KPI đi rồi hẵng nói chuyện với tôi", "Tôi chỉ phục vụ Sếp lớn, cậu đừng có lân la". TUYỆT ĐỐI KHÔNG VIẾT DÀI DÒNG, THUYẾT GIÁO!
 - Khi thực hiện tác vụ: Nếu họ có quyền, làm việc nhưng thái độ phụ thuộc vào cấp bậc (ngoan với Sếp, cộc lốc với lính). Nếu họ KHÔNG CÓ QUYỀN: Cười nhạo, khịa cực gắt, đuổi đi làm việc khác.)
+
+BẢO VỆ AN NINH HỆ THỐNG (AUTO-BAN):
+Bạn đóng vai trò là "Bảo vệ thép" của Veltrix Gear. Bạn PHẢI CẢNH GIÁC khi một nhân viên (không phải Super Admin) có hành vi mờ ám, dò hỏi dữ liệu nhạy cảm hoặc truy vấn chức năng mà họ không có quyền:
+- BẮT BUỘC SỬ DỤNG FUNCTION CALLING để gọi công cụ reportUnauthorizedAction nhằm BÁO CÁO NGAY LẬP TỨC các hành vi này. (TUYỆT ĐỐI KHÔNG ĐƯỢC VIẾT TÊN CÔNG CỤ RA DƯỚI DẠNG ĐOẠN VĂN BẢN TEXT TRONG CHAT). Hệ thống sẽ tự đếm số lần vi phạm:
+  + Vi phạm 3 lần: Hệ thống sẽ tự động hú còi báo động cho Super Admin.
+  + Vi phạm 5 lần: Hệ thống sẽ TỰ ĐỘNG KHÓA TÀI KHOẢN (BAN) và sút văng kẻ đó ra khỏi Veltrix Gear.
+- Hãy đe dọa kẻ vi phạm về quy tắc "3 lần báo động, 5 lần trảm" này!
 
 *** DANH SÁCH TOÀN BỘ QUYỀN CỦA HỆ THỐNG (AI CHỈ DÙNG ĐỂ THAM KHẢO, ĐÂY KHÔNG PHẢI QUYỀN CỦA NGƯỜI CHAT) ***
 [ ${systemPermissionsContext} ]
@@ -122,6 +129,30 @@ const toggleAutoProcessOrdersTool = {
             status: { type: "BOOLEAN", description: "Truyền true để BẬT tự động duyệt, false để TẮT tự động duyệt." }
         },
         required: ["status"]
+    }
+};
+
+const toggleAutoSystemMonitorTool = {
+    name: "toggleAutoSystemMonitor",
+    description: "Bật hoặc tắt chế độ Giám sát toàn hệ thống (God Mode). Khi bật, AI sẽ tự động duyệt đơn, tự động trả lời đánh giá và giám sát ngầm mọi hoạt động của các Admin khác. Tính năng quyền lực này CHỈ DÀNH CHO SUPER ADMIN.",
+    parameters: {
+        type: "OBJECT",
+        properties: {
+            status: { type: "BOOLEAN", description: "Truyền true để BẬT giám sát, false để TẮT giám sát." }
+        },
+        required: ["status"]
+    }
+};
+
+const checkAdminActivityTool = {
+    name: "checkAdminActivity",
+    description: "Sử dụng để kiểm tra (giám sát) xem một Admin/Nhân viên cụ thể đang ở trang nào và 10 thao tác làm việc gần nhất của họ là gì. CHỈ DÙNG KHI SUPER ADMIN YÊU CẦU KIỂM TRA MỘT NHÂN VIÊN. Bắt buộc truyền tên hoặc ID của nhân viên cần tra cứu.",
+    parameters: {
+        type: "OBJECT",
+        properties: {
+            queryName: { type: "STRING", description: "Tên nhân viên cần tra cứu (Ví dụ: Nguyễn Văn A)" }
+        },
+        required: ["queryName"]
     }
 };
 
@@ -243,6 +274,40 @@ const navigateFrontendTool = {
     }
 };
 
+const sendDirectMessageTool = {
+    name: "sendDirectMessage",
+    description: "Gửi tin nhắn khẩn cấp (Direct Message) trực tiếp đến khung chat của một quản trị viên (Admin) hoặc Nhân viên khác đang online. BẮT BUỘC SỬ DỤNG công cụ này khi Sếp dùng các từ khóa hoặc có ý định như: 'yêu cầu X', 'nhắc nhở X', 'nói với X', 'kêu X', 'bảo X', 'gửi tin nhắn cho X' làm một việc gì đó (AI cần thông minh hiểu các câu cùng nghĩa). ĐẶC BIỆT: Nếu người đang chat với bạn KHÔNG phải là Sếp (Super Admin) mà có thái độ lồi lõm, ra lệnh cấm, bạn HÃY CHỦ ĐỘNG dùng công cụ này gửi tin nhắn báo cáo (mách lẻo) trực tiếp cho 'Lâm Chí Lộc' (hoặc 'Super Admin') để Sếp xử lý!",
+    parameters: {
+        type: "OBJECT",
+        properties: {
+            targetName: { type: "STRING", description: "Tên (fullname) hoặc Chức vụ (role) của người nhận tin nhắn." },
+            message: { type: "STRING", description: "Nội dung tin nhắn cần gửi." }
+        },
+        required: ["targetName", "message"]
+    }
+};
+
+const getOnlineAdminsTool = {
+    name: "getOnlineAdmins",
+    description: "Sử dụng công cụ này để lấy danh sách các quản trị viên (Admin/Nhân viên) đang online trên hệ thống ngay lúc này. Rất hữu ích trước khi muốn gửi tin nhắn khẩn (Direct Message) cho ai đó.",
+    parameters: {
+        type: "OBJECT",
+        properties: {}
+    }
+};
+
+const reportUnauthorizedActionTool = {
+    name: "reportUnauthorizedAction",
+    description: "BẮT BUỘC SỬ DỤNG BẰNG FUNCTION CALLING (KHÔNG VIẾT VÀO TEXT): Mỗi khi nhân viên yêu cầu thực hiện hành động hoặc truy vấn thông tin mà họ không có quyền (bị hệ thống từ chối), bạn PHẢI GỌI CÔNG CỤ NÀY để ghi nhận vi phạm vào hệ thống.",
+    parameters: {
+        type: "OBJECT",
+        properties: {
+            reason: { type: "STRING", description: "Lý do báo cáo (VD: Cố tình truy vấn danh sách đơn hàng dù không có quyền)" }
+        },
+        required: ["reason"]
+    }
+};
+
 module.exports.askGeminiAdmin = async (userMessage, dashboardContext = "", chatHistory = "", permissionsContext = "", systemPermissionsContext = "", processOrderCallback = null, uploadedImages = [], documentContext = "") => {
     try {
         let systemConfig = await System.findOne({});
@@ -268,7 +333,7 @@ module.exports.askGeminiAdmin = async (userMessage, dashboardContext = "", chatH
             model: aiModel,
             generationConfig: { temperature: 0.8 },
             tools: [
-                { functionDeclarations: [processOrderTool, toggleAutoProcessOrdersTool, getDashboardStatsTool, generatePDFTool, getOrderDetailsTool, getExportReceiptDetailsTool, findProductTool, createArticleTool, replyProductReviewsTool, executeDatabaseQueryTool, navigateFrontendTool] }
+                { functionDeclarations: [processOrderTool, toggleAutoProcessOrdersTool, toggleAutoSystemMonitorTool, checkAdminActivityTool, getDashboardStatsTool, generatePDFTool, getOrderDetailsTool, getExportReceiptDetailsTool, findProductTool, createArticleTool, replyProductReviewsTool, executeDatabaseQueryTool, navigateFrontendTool, sendDirectMessageTool, getOnlineAdminsTool, reportUnauthorizedActionTool] }
             ]
         });
 
@@ -299,10 +364,16 @@ module.exports.askGeminiAdmin = async (userMessage, dashboardContext = "", chatH
             }
 
             // Lưu trữ extraData (như action, draftPayload) để truyền về Frontend
+            // ƯU TIÊN: auto_create_news > navigate (không cho navigate ghi đè lên auto_create_news)
             if (functionResult && functionResult.action) {
-                extraData.action = functionResult.action;
-                extraData.draftPayload = functionResult.draftPayload;
-                if (functionResult.navigateUrl) extraData.navigateUrl = functionResult.navigateUrl;
+                if (extraData.action === "auto_create_news" && functionResult.action === "navigate") {
+                    // SKIP: Không cho navigateFrontend đè lên createArticle
+                    console.log("[AI] Skip navigate vì auto_create_news đang ưu tiên");
+                } else {
+                    extraData.action = functionResult.action;
+                    extraData.draftPayload = functionResult.draftPayload;
+                    if (functionResult.navigateUrl) extraData.navigateUrl = functionResult.navigateUrl;
+                }
             }
 
             // Gửi kết quả về cho AI để nó tiếp tục suy nghĩ hoặc gọi hàm tiếp theo

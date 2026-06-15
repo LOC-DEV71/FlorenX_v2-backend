@@ -203,14 +203,16 @@ module.exports.order = async (req, res) => {
       { $set: { products: [] } }
     )
 
+    // Luôn bắn Socket thông báo có đơn hàng mới cho Admin (để đổ chuông báo động)
+    const io = req.app.get("io");
+    if (io) {
+      // Bắn socket kèm theo flag force: true để báo đây là đơn mới, front-end tự hú còi
+      io.emit("admin_auto_pilot_trigger", { orderCode: createOrder.code, force: true });
+    }
+
     // AI Auto-Pilot Trigger: Xử lý duyệt đơn tự động ngầm
     const system = await System.findOne({});
     if (system && system.ai && system.ai.autoProcessOrders === true) {
-      // Bắn Socket kích hoạt hiệu ứng Auto-Pilot trên UI Admin
-      const io = req.app.get("io");
-      if (io) {
-        io.emit("admin_auto_pilot_trigger", { orderCode: createOrder.code });
-      }
 
       // Chạy bất đồng bộ, không cần await để khách hàng nhận được phản hồi ngay
       processOrderLogic(createOrder.code).then(res => {

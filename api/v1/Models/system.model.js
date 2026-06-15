@@ -26,6 +26,7 @@ const systemSchema = new mongoose.Schema(
       requestsToday: { type: Number, default: 0 },
       lastResetDate: { type: Date, default: Date.now },
       autoProcessOrders: { type: Boolean, default: false }, // Bật/tắt duyệt đơn tự động
+      autoSystemMonitor: { type: Boolean, default: false }, // Bật/tắt chế độ giám sát toàn hệ thống
       botAvatar: { type: String, default: '' } // Avatar hiển thị khi AI trả lời đánh giá
     },
     

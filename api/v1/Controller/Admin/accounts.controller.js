@@ -1,4 +1,5 @@
 const Account = require("../../Models/accounts.model");
+const ActivityLog = require("../../Models/activityLog.model");
 const bcrypt = require("bcryptjs");
 const jwtUtils = require("../../../../utils/jwt.utils");
 module.exports.index = async (req, res) => {
@@ -167,3 +168,23 @@ module.exports.changeMulti = async (req, res) => {
         })
     }
 }
+
+module.exports.getActivityLogs = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const logs = await ActivityLog.find({ accountId: id })
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .lean();
+            
+        return res.status(200).json({
+            code: true,
+            logs
+        });
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error}`,
+            code: false
+        });
+    }
+};

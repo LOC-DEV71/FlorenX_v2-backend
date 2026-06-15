@@ -23,6 +23,10 @@ const productPreviewRoutes = require("./product.preview.routes.js")
 const systemRoutes = require("./system.routes.js")
 const dashboardRoutes = require("./dashboard.routes.js");
 const aiRoutes = require("./ai.routes.js");
+const activityLogger = require("../../Middlewares/admin/activityLogger.js");
+
+// Bật giám sát ngầm cho mọi routes bên trong admin
+router.use(activityLogger);
 
 router.use("/dashboard", dashboardRoutes);
 router.use("/products", productRoutes);

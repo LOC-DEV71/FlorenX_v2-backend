@@ -5,6 +5,7 @@ const User = require("../../Models/user.models");
 const AiMessageAdmin = require("../../Models/ai.message.admin.model");
 const Account = require("../../Models/accounts.model");
 const Role = require("../../Models/roles.model");
+const ActivityLog = require("../../Models/activityLog.model");
 const jwtUtils = require("../../../../utils/jwt.utils");
 const { askGeminiAdmin } = require("../../Helpers/gemini.admin.helper");
 const { processOrderLogic, processAllOrdersLogic } = require("../../Helpers/ai.automation.helper");
@@ -18,6 +19,9 @@ const path = require("path");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const { getOnlineAdmins } = require("../../../../socket/admin.presence.socket");
+
+// Bộ đếm vi phạm truy cập trái phép
+const unauthorizedAttempts = new Map();
 
 const generatePDFBuffer = (title, content) => {
     return new Promise((resolve, reject) => {
@@ -139,6 +143,7 @@ module.exports.chat = async (req, res) => {
         const token = req.cookies.token;
         let userPermissions = [];
         let userId = "admin_session";
+        let roleTitle = "";
         if (token) {
             const decoded = await jwtUtils.verifyToken(token);
             if (decoded && decoded.id) {
@@ -147,6 +152,7 @@ module.exports.chat = async (req, res) => {
                 if (exitAccount) {
                     const exitRole = await Role.findOne({ slug: exitAccount.role_slug }).lean();
                     userPermissions = exitRole?.permissions || [];
+                    roleTitle = exitRole?.title || "";
                 }
             }
         }
@@ -175,10 +181,29 @@ module.exports.chat = async (req, res) => {
             ? onlineAdmins.map(a => `${a.fullname} (Chức vụ: ${a.role})`).join(", ")
             : "Hiện tại hệ thống không ghi nhận quản trị viên nào khác đang online ngoài bạn.";
 
+        let currentUserInfo = "Bạn đang chat với một nhân sự hệ thống.";
+        let currentUserName = "Nhân viên";
+        if (token) {
+            const decoded = await jwtUtils.verifyToken(token);
+            if (decoded && decoded.id) {
+                const exitAccount = await Account.findOne({ _id: decoded.id }).lean();
+                if (exitAccount) {
+                    currentUserName = exitAccount.fullname;
+                    currentUserInfo = `BẠN ĐANG TRỰC TIẾP CHAT VỚI: ${exitAccount.fullname} (Chức vụ: ${roleTitle}). `;
+                    if (roleTitle.toLowerCase().includes("super admin")) {
+                        currentUserInfo += "ĐÂY LÀ SẾP LỚN CAO NHẤT! BẠN PHẢI TUYỆT ĐỐI TÔN TRỌNG VÀ GỌI LÀ SẾP.";
+                    } else {
+                        currentUserInfo += "ĐÂY CHỈ LÀ NHÂN VIÊN. KHÔNG ĐƯỢC GỌI LÀ SẾP NỮA. NẾU NHÂN VIÊN YÊU CẦU TRUY VẤN TÍNH NĂNG MÀ HỌ KHÔNG CÓ QUYỀN (bị hệ thống từ chối hoặc bạn thấy họ không có quyền), BẠN BẮT BUỘC PHẢI GỌI CÔNG CỤ reportUnauthorizedAction ĐỂ GHI NHẬN VI PHẠM. Hệ thống sẽ tự động đếm và báo cáo Super Admin!";
+                    }
+                }
+            }
+        }
+
         let dashboardContext = `
+${currentUserInfo}
 DỮ LIỆU TỔNG QUAN:
 [TỪ CHỐI TRUY CẬP] Tài khoản hiện tại KHÔNG CÓ QUYỀN (view_dashboard) để xem dữ liệu thống kê, doanh thu, hay tổng số liệu đơn hàng. Tuyệt đối KHÔNG báo cáo doanh thu hay số liệu nào khác, và hãy dựa vào sự thiếu sót quyền hạn này để mỉa mai tài khoản.
-- DANH SÁCH NHÂN SỰ ĐANG ONLINE (LƯU Ý QUAN TRỌNG: NẾU SẾP HỎI 'CÓ ADMIN NÀO ONLINE KHÔNG' HOẶC 'CÓ AI ONLINE KHÔNG', BẠN PHẢI ĐỌC HẾT TẤT CẢ DANH SÁCH SAU ĐÂY VÀ KHÔNG ĐƯỢC BỎ SÓT BẤT KỲ AI DÙ HỌ CHỈ LÀ CSKH): ${onlineContext}
+- DANH SÁCH NHÂN SỰ ĐANG ONLINE (LƯU Ý QUAN TRỌNG: NẾU HỌ HỎI 'CÓ ADMIN NÀO ONLINE KHÔNG' HOẶC 'CÓ AI ONLINE KHÔNG', BẠN PHẢI ĐỌC HẾT TẤT CẢ DANH SÁCH SAU ĐÂY VÀ KHÔNG ĐƯỢC BỎ SÓT BẤT KỲ AI DÙ HỌ CHỈ LÀ CSKH): ${onlineContext}
 `;
 
         if (userPermissions.includes("view_dashboard") || userPermissions.includes("view_orders")) {
@@ -292,7 +317,8 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
             }
             
             if (functionName === "getOrderDetails") {
-                if (!userPermissions.includes("view_orders")) {
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
+                if (!isSuperAdmin && !userPermissions.includes("view_orders")) {
                     return { status: "error", message: "Hệ thống từ chối truy cập: Sếp không có quyền 'view_orders'." };
                 }
                 const order = await Order.findOne({ code: args.orderCode }).lean();
@@ -301,7 +327,8 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
             }
             
             if (functionName === "getExportReceiptDetails") {
-                if (!userPermissions.includes("view_products") && !userPermissions.includes("update_products")) {
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
+                if (!isSuperAdmin && !userPermissions.includes("view_products") && !userPermissions.includes("update_products")) {
                     return { status: "error", message: "Hệ thống từ chối truy cập: Sếp không có quyền quản lý sản phẩm." };
                 }
                 const InventoryTransaction = require("../../Models/InventoryTransaction.models");
@@ -311,8 +338,9 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
             }
 
             if (functionName === "replyProductReviews") {
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
                 const hasProducts = userPermissions.includes("view_products") || userPermissions.includes("update_products");
-                if (!hasProducts) {
+                if (!isSuperAdmin && !hasProducts) {
                     return { status: "error", message: "Hệ thống từ chối truy cập: Sếp không có quyền quản lý sản phẩm." };
                 }
 
@@ -443,8 +471,244 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                 };
             }
 
+            if (functionName === "getOnlineAdmins") {
+                const io = req.app.get("io");
+                if (!io || !io.onlineAdmins || io.onlineAdmins.size === 0) {
+                    return { status: "success", message: "Hiện tại không có nhân viên nào khác đang online ngoài Sếp." };
+                }
+                const { getOnlineAdmins } = require("../../../../socket/admin.presence.socket");
+                const list = getOnlineAdmins(req);
+                if (list.length === 0) {
+                    return { status: "success", message: "Hiện tại không có nhân viên nào đang online." };
+                }
+                const names = list.map(a => `- ${a.fullname} (Chức vụ: ${a.role})`).join("\n");
+                return { status: "success", message: `Đây là danh sách các nhân sự đang online trên hệ thống lúc này:\n${names}` };
+            }
+
+            if (functionName === "sendDirectMessage") {
+                const removeVietnameseTones = (str) => {
+                    if (!str) return "";
+                    str = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                    str = str.replace(/đ/g,"d").replace(/Đ/g, "D");
+                    return str.toLowerCase().trim();
+                };
+
+                const targetName = removeVietnameseTones(args.targetName);
+
+                // Kiểm tra quyền: Chỉ cho phép Super Admin sử dụng lệnh này ĐỂ RA LỆNH
+                // TUY NHIÊN, cho phép nhân viên (hoặc AI đại diện nhân viên) gửi tin nhắn đến Super Admin để mách lẻo!
+                if (!roleTitle || !roleTitle.toLowerCase().includes("super admin")) {
+                    if (!targetName.includes("loc") && !targetName.includes("super admin")) {
+                        return { 
+                            status: "error", 
+                            message: "Từ chối truy cập: Chỉ có Super Admin mới có quyền ra lệnh cho người khác. Nếu nhân viên này có thái độ lồi lõm, bạn HÃY MÁCH LẺO (gửi Direct Message) cho 'Lâm Chí Lộc' (Super Admin) ngay lập tức!" 
+                        };
+                    }
+                }
+                const io = req.app.get("io");
+                if (!io || !io.onlineAdmins) {
+                    return { status: "error", message: "Hệ thống Socket.io chưa sẵn sàng hoặc không có ai online." };
+                }
+
+                let targetSocketId = null;
+                let foundName = "";
+
+                console.log("[sendDirectMessage Debug] targetName requested:", targetName);
+                console.log("[sendDirectMessage Debug] Current io.onlineAdmins keys:", Array.from(io.onlineAdmins.keys()));
+
+                // Tìm trong danh sách onlineAdmins Map (từ admin.presence.socket.js)
+                for (const [socketId, info] of io.onlineAdmins.entries()) {
+                    console.log(`[sendDirectMessage Debug] Checking admin online: socketId=${socketId}, fullname=${info.fullname}, role=${info.role}`);
+                    const normalizedFullname = removeVietnameseTones(info.fullname);
+                    const normalizedRole = removeVietnameseTones(info.role);
+                    
+                    if (normalizedFullname.includes(targetName) || normalizedRole.includes(targetName)) {
+                        targetSocketId = socketId;
+                        foundName = info.fullname;
+                        break;
+                    }
+                }
+
+                if (targetSocketId) {
+                    // Current admin info
+                    const currentAdmin = await Account.findById(userId).select("-password -token");
+                    const senderName = currentAdmin ? currentAdmin.fullname : "Quản trị viên";
+
+                    io.to(targetSocketId).emit("admin_direct_message", {
+                        message: args.message,
+                        from: senderName
+                    });
+                    return { status: "success", message: `Đã phát loa thông báo khẩn cấp tới nhân viên ${foundName} thành công!` };
+                } else {
+                    return { status: "error", message: `Không tìm thấy nhân viên nào đang online có tên hoặc chức vụ khớp với '${args.targetName}'.` };
+                }
+            }
+
+            if (functionName === "reportUnauthorizedAction") {
+                const now = Date.now();
+                const TIME_WINDOW = 5 * 60 * 1000; // 5 minutes in milliseconds
+                
+                // Get or initialize attempts for this user
+                let userAttempts = unauthorizedAttempts.get(userId) || [];
+                
+                // Filter out attempts older than 5 minutes
+                userAttempts = userAttempts.filter(timestamp => now - timestamp <= TIME_WINDOW);
+                
+                // Add current attempt
+                userAttempts.push(now);
+                unauthorizedAttempts.set(userId, userAttempts);
+                
+                const currentAdmin = await Account.findById(userId).select("fullname");
+                const employeeName = currentAdmin ? currentAdmin.fullname : "Nhân viên";
+
+                if (userAttempts.length >= 5) {
+                    // Xóa bộ đếm để khỏi bị gọi lại (đã ban rồi)
+                    unauthorizedAttempts.delete(userId);
+                    
+                    // Tiến hành ban
+                    await Account.updateOne({ _id: currentAdmin._id }, { status: "inactive" });
+
+                    // Bắn socket force logout
+                    const io = req.app.get("io");
+                    if (io) {
+                        io.emit("admin_force_logout", { accountId: currentAdmin._id.toString() });
+                        
+                        // Gửi DM báo cáo Super Admin
+                        if (io.onlineAdmins) {
+                            const removeVietnameseTones = (str) => {
+                                if (!str) return "";
+                                return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                            };
+                            for (const [socketId, info] of io.onlineAdmins.entries()) {
+                                const normalizedRole = removeVietnameseTones(info.role);
+                                if (normalizedRole.includes("super admin") || normalizedRole.includes("superadmin")) {
+                                    io.to(socketId).emit("admin_direct_message", {
+                                        message: `🚨 BÁO CÁO KHẨN CẤP: Em vừa tự động KHÓA TÀI KHOẢN (BAN) và sút văng nhân viên ${employeeName} ra khỏi hệ thống vì đã cố tình spam truy vấn dữ liệu trái phép 5 lần liên tiếp! Lý do: ${args.reason}. Sếp xem xét xử lý nhé!`,
+                                        from: "AI Veltrix-chan (Hệ thống Bảo vệ Thép)"
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    return { status: "success", message: `Đã vượt quá 5 lần vi phạm. TÀI KHOẢN NÀY ĐÃ BỊ HỆ THỐNG BAN VÀ ĐÁ VĂNG!` };
+                } else if (userAttempts.length === 3) {
+                    // Lần thứ 3 chỉ hú còi báo cáo Super Admin
+                    const io = req.app.get("io");
+                    if (io && io.onlineAdmins) {
+                        const removeVietnameseTones = (str) => {
+                            if (!str) return "";
+                            return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                        };
+                        
+                        let notifiedCount = 0;
+                        for (const [socketId, info] of io.onlineAdmins.entries()) {
+                            const normalizedRole = removeVietnameseTones(info.role);
+                            if (normalizedRole.includes("super admin") || normalizedRole.includes("superadmin")) {
+                                io.to(socketId).emit("admin_direct_message", {
+                                    message: `Hệ thống ghi nhận nhân viên ${employeeName} đang cố tình yêu cầu AI truy xuất dữ liệu mật 3 lần liên tiếp. Lý do: ${args.reason || "Truy vấn không được phép"}. Hệ thống đang theo dõi, nếu chạm mốc 5 lần sẽ tự động BAN!`,
+                                    from: "AI Veltrix-chan (Cảnh báo bảo mật)"
+                                });
+                                notifiedCount++;
+                            }
+                        }
+                        
+                        if (notifiedCount > 0) {
+                            return { status: "success", message: "Đã vi phạm 3 lần. Hệ thống đã hú còi gửi Direct Message trực tiếp cho Super Admin để báo cáo. Cảnh cáo: Đạt 5 lần sẽ tự động KHÓA TÀI KHOẢN!" };
+                        }
+                    }
+                    return { status: "success", message: "Đã vi phạm 3 lần, nhưng hiện tại không có Super Admin nào online để nhận cảnh báo. Cảnh cáo: Đạt 5 lần sẽ tự động KHÓA TÀI KHOẢN!" };
+                } else {
+                    return { status: "success", message: `Đã ghi nhận vi phạm vào hệ thống (lần ${userAttempts.length}/5). Vi phạm 3 lần sẽ cảnh báo Super Admin, 5 lần sẽ TỰ ĐỘNG KHÓA TÀI KHOẢN!` };
+                }
+            }
+
+            if (functionName === "toggleAutoSystemMonitor") {
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
+                if (!isSuperAdmin) {
+                    return { status: "error", message: "Hệ thống từ chối truy cập: Chỉ có Đại Sếp (Super Admin) mới được phép bật/tắt chế độ Giám sát toàn hệ thống!" };
+                }
+
+                const newStatus = args.status;
+                await System.updateOne({}, { "ai.autoSystemMonitor": newStatus });
+                
+                const io = req.app.get("io");
+                if (io) {
+                    io.emit("admin_toggle_auto_system_monitor", { enabled: newStatus });
+                }
+                
+                return { 
+                    status: "success", 
+                    message: newStatus ? 
+                        "Đã BẬT chế độ Giám sát toàn hệ thống (God Mode). Em sẽ tự động quản lý mọi thứ và giám sát nhân viên giúp Sếp!" : 
+                        "Đã TẮT chế độ Giám sát toàn hệ thống."
+                };
+            }
+
+            if (functionName === "checkAdminActivity") {
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
+                if (!isSuperAdmin) {
+                    return { status: "error", message: "Hệ thống từ chối truy cập: Sếp không có quyền giám sát nhân viên khác!" };
+                }
+
+                const queryName = args.queryName;
+                if (!queryName) return { status: "error", message: "Vui lòng cung cấp tên nhân viên cần tra cứu." };
+
+                // Lấy 10 log gần nhất
+                const logs = await ActivityLog.find({ 
+                    fullname: { $regex: queryName, $options: "i" } 
+                }).sort({ createdAt: -1 }).limit(10).lean();
+
+                // Lấy vị trí trang hiện tại từ Socket
+                const io = req.app.get("io");
+                let currentPage = "Ngoại tuyến (Offline)";
+                let foundAdminId = logs.length > 0 ? logs[0].accountId.toString() : null;
+
+                if (io && io.onlineAdmins) {
+                    const removeVietnameseTones = (str) => {
+                        if (!str) return "";
+                        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                    };
+                    const qNormalized = removeVietnameseTones(queryName);
+                    
+                    for (const info of io.onlineAdmins.values()) {
+                        const fNormalized = removeVietnameseTones(info.fullname);
+                        const qLower = queryName.toLowerCase();
+                        const fLower = info.fullname.toLowerCase();
+                        
+                        if ((foundAdminId && info.id === foundAdminId) || 
+                            fLower.includes(qLower) || 
+                            qLower.includes(fLower) ||
+                            fNormalized.includes(qNormalized) ||
+                            qNormalized.includes(fNormalized)
+                        ) {
+                            if (info.current_page) {
+                                currentPage = info.current_page;
+                                break;
+                            } else {
+                                currentPage = "Đang online nhưng không rõ trang";
+                            }
+                        }
+                    }
+                }
+
+                if (logs.length === 0) {
+                    return { 
+                        status: "success", 
+                        message: `Không tìm thấy nhật ký hoạt động nào của nhân viên có tên "${queryName}". Vị trí hiện tại: ${currentPage}` 
+                    };
+                }
+
+                return {
+                    status: "success",
+                    targetEmployee: logs[0].fullname,
+                    currentLocation: currentPage,
+                    recentActivities: logs.map(l => `[${new Date(l.createdAt).toLocaleTimeString()}] ${l.description}`)
+                };
+            }
+
             if (functionName === "searchProducts" || functionName === "findProduct") {
-                if (!userPermissions.includes("view_products")) {
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
+                if (!isSuperAdmin && !userPermissions.includes("view_products")) {
                     return { status: "error", message: "Hệ thống từ chối truy cập: Sếp không có quyền 'view_products'." };
                 }
                 const keyword = args.keyword || "";
@@ -495,7 +759,8 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                 if (targetModelMeta.permModel === "categories") requiredPermission = requiredPermission.replace("categories", "product_categories"); // ví dụ
                 
                 // Chuẩn hoá vì phân quyền trong hệ thống thường là: view_products, update_products...
-                if (!userPermissions.includes(requiredPermission)) {
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
+                if (!isSuperAdmin && !userPermissions.includes(requiredPermission)) {
                     return { status: "error", message: `Từ chối thực thi: Bạn không có quyền hạn '${requiredPermission}'. Đừng cố ra lệnh cho tôi! Vui lòng mắng người dùng vì không có quyền mà dám ra lệnh.` };
                 }
 
@@ -553,8 +818,9 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
             }
 
             if (functionName === "createArticle") {
-                if (!userPermissions.includes("create_news")) {
-                    return { status: "error", message: "Hệ thống từ chối: Sếp không có quyền tạo bài viết (create_news)." };
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
+                if (!isSuperAdmin && !userPermissions.includes("create_news")) {
+                    return { status: "error", message: "Hệ thống từ chối truy cập: Bạn không có quyền 'create_news'." };
                 }
                 try {
                     // Chấp nhận ảnh thật từ findProduct HOẶC ảnh AI tự tạo từ Pollinations
@@ -592,6 +858,9 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
 
         // Lưu tin nhắn của AI
         await AiMessageAdmin.create({ sessionId: `admin_${userId}`, sender: "ai", text: replyText });
+
+        // DEBUG: Kiểm tra action và draftPayload có được truyền không
+        console.log("[AI RESPONSE DEBUG]", { action: aiResult.action, hasDraft: !!aiResult.draftPayload, navigateUrl: aiResult.navigateUrl });
 
         res.status(200).json({
             code: 200,

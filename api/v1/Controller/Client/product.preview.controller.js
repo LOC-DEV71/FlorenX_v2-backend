@@ -67,19 +67,22 @@ module.exports.commentProduct = async (req, res) => {
 
         await createNotifi.save();
 
+        // Luôn bắn Socket thông báo có đánh giá mới cho Admin (để đổ chuông báo động)
+        const io = req.app.get("io");
+        if (io) {
+            // Bắn Socket kích hoạt hiệu ứng Auto-Pilot trên UI Admin
+            io.emit("admin_auto_pilot_review_trigger", { 
+                force: true,
+                reviewId: createPreview._id, 
+                slug: product.slug, 
+                rating: createPreview.rating, 
+                comment: createPreview.comment 
+            });
+        }
+
         // AI Auto-Pilot Trigger: Tự động trả lời đánh giá ngầm
         const system = await System.findOne({});
-        if (system && system.ai && system.ai.autoProcessOrders === true) {
-            const io = req.app.get("io");
-            if (io) {
-                // Bắn Socket kích hoạt hiệu ứng Auto-Pilot trên UI Admin
-                io.emit("admin_auto_pilot_review_trigger", { 
-                    reviewId: createPreview._id, 
-                    slug: product.slug, 
-                    rating: createPreview.rating, 
-                    comment: createPreview.comment 
-                });
-            }
+        if (system && system.ai && (system.ai.autoProcessOrders === true || system.ai.autoSystemMonitor === true)) {
 
             // Chạy bất đồng bộ để AI tự sinh câu trả lời và lưu vào db
             processReviewLogic(createPreview._id, io).then(res => {
