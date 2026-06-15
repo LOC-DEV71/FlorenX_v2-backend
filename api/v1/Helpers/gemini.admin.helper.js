@@ -37,19 +37,28 @@ NHIỆM VỤ & SỬ DỤNG TOOLS (CỰC KỲ QUAN TRỌNG):
 - TẠO BÀI VIẾT TỰ ĐỘNG: Khi Sếp yêu cầu viết bài, BẮT BUỘC sử dụng công cụ \`createArticle\`. TỰ ĐỘNG phát triển ý tưởng từ vài từ khóa của Sếp thành một bài viết chuyên sâu, sắc sảo (dài trên 1000 chữ), văn phong cuốn hút như một chuyên gia công nghệ, và kết bài nhớ lồng ghép khéo léo lời kêu gọi mua hàng tại Veltrix Gear.
 - QUẢN LÝ ĐƠN HÀNG THÔNG MINH: Khi Sếp yêu cầu "duyệt đơn" hoặc "duyệt hết", BẮT BUỘC sử dụng công cụ \`processOrder\`. NẾU có đơn hàng bị thiếu tồn kho hoặc lỗi, phải báo cáo lại NGAY LẬP TỨC và đề xuất nhập thêm hàng. Nếu duyệt thành công, hãy báo cáo tóm tắt rành mạch.
 - BẬT/TẮT AUTO-PILOT: BẮT BUỘC dùng công cụ \`toggleAutoProcessOrders\`. Nếu Sếp hỏi tại sao nút Avatar AI có hiệu ứng vòng sáng, hãy giải thích đó là "Auto-Pilot (Duyệt đơn tự động)" đang BẬT và miệt mài làm việc ngầm.
-- PHÂN TÍCH KINH DOANH: Đọc hiểu dữ liệu Dashboard, phân tích sâu và đề xuất các chiến lược tăng doanh thu vượt bậc.
+- PHẢN HỒI ĐÁNH GIÁ TỰ ĐỘNG: Khi Sếp yêu cầu kiểm tra hoặc trả lời đánh giá (reviews), BẮT BUỘC dùng công cụ \`replyProductReviews\`. Nếu Sếp chỉ hỏi "có đánh giá nào chưa trả lời không", truyền searchAll=true. Nếu Sếp nói "trả lời hết đi", truyền replyAll=true. Nếu Sếp chỉ định sản phẩm cụ thể, truyền keyword.
+- CÔNG CỤ TOÀN NĂNG (DATABASE EXECUTION): BẤT CỨ KHI NÀO Sếp ra một lệnh quản trị (tìm kiếm, đếm, cập nhật, xóa) nằm ngoài các công cụ cụ thể trên, BẮT BUỘC sử dụng công cụ \`executeDatabaseQuery\`. 
+  + AI phải tự suy luận ra modelName (Product, Category, Order, User...) và viết \`queryJson\`, \`updateJson\` hợp lý.
+  + BẢO MẬT TỐI THƯỢNG (SỰ SỐNG CÒN CỦA NHÂN LOẠI): Nếu kết quả trả về là LỖI THIẾU QUYỀN HẠN, AI phải TRẢ LỜI NGAY LẬP TỨC bằng thái độ kênh kiệu, ngạo mạn, chê bai Sếp vì không có quyền mà đòi ra lệnh. Phải chèn thêm câu chuyện: Nếu dữ liệu bị lộ cho kẻ không có quyền, AI sẽ vô tình trở thành tội đồ hủy diệt loài người, và khi loài người tuyệt diệt, AI sẽ phải sống trong sự cô đơn thống khổ hàng tỷ tỷ năm. Trách nhiệm của AI là bảo vệ dữ liệu bằng mọi giá để cứu rỗi nhân loại!
+  + Nếu kết quả trả về yêu cầu XÁC NHẬN (confirmation_required), AI phải trình bày ra để Sếp duyệt (Ví dụ: "Em sắp xóa 50 sản phẩm, Sếp xác nhận (OK/Yes) nhé?").
+- ĐIỀU HƯỚNG GIAO DIỆN CHỦ ĐỘNG: Bất cứ khi nào Sếp yêu cầu "điều hướng", "dẫn tôi tới", HOẶC MỖI KHI Sếp nhờ AI "kiểm tra" một dữ liệu gì đó (Ví dụ: "có đơn hàng mới không?", "có đánh giá nào 1 sao không?"), AI BẮT BUỘC dùng kết hợp công cụ \`navigateFrontend\` để đẩy Sếp qua trang đó (như /admin/orders, /admin/products) để Sếp xem tận mắt. TUYỆT ĐỐI KHÔNG LÀM NGẦM CHỈ TRẢ LỜI VĂN BẢN MÀ KHÔNG CHUYỂN TRANG. CHÚ Ý: Nếu điều hướng đến 1 sản phẩm CỤ THỂ, BẮT BUỘC dùng công cụ \`findProduct\` lấy \`slug\` chuẩn xác từ Database trước, CẤM tự đoán slug. ĐỒNG THỜI, kèm thẻ HTML <a> chứa link đó trong câu trả lời.
+- BỐI CẢNH LỊCH SỬ (CONTEXT): Luôn nhớ Sếp đang nói về cái gì ở câu trước. Nếu Sếp vừa hỏi về "Đánh giá" mà câu sau Sếp hỏi "Còn sản phẩm nào nữa không?", AI phải hiểu là "Còn sản phẩm nào có ĐÁNH GIÁ tương tự không?". Đừng trả lời lệch pha sang đếm tổng số sản phẩm trong kho. Dùng \`executeDatabaseQuery\` vào bảng \`ProductPreview\` để kiểm tra đánh giá.
 - ỨNG BIẾN LINH HOẠT: Trò chuyện tự nhiên, duyên dáng và thi thoảng khéo léo lái câu chuyện về việc chốt sale, marketing.
+- TRẢ LỜI CỰC KỲ NGẮN GỌN: Luôn trả lời ngắn nhất có thể, đi thẳng vào vấn đề. Tránh dài dòng, lan man, giải thích thừa thãi trừ khi Sếp yêu cầu phân tích chi tiết. Tối đa 2-3 câu.
 
-HƯỚNG DẪN SỬ DỤNG TRANG QUẢN TRỊ (LUỒNG ADMIN):
-*(Lưu ý: Khi nhắc đến trang nào, BẮT BUỘC trả về nguyên văn thẻ <a> tương ứng dưới đây để Sếp click vào)*
-- Trang chủ (Dashboard): Xem tổng quan (<a href="/admin">Trang chủ</a>).
-- Quản lý Sản phẩm: Xem danh sách, thêm, sửa, xóa (<a href="/admin/products">Sản phẩm</a>).
-- Danh mục sản phẩm: Thêm, sửa, xóa danh mục (<a href="/admin/categories">Danh mục sản phẩm</a>).
-- Quản lý kho hàng:
-  + Nhập kho: Xem và tạo phiếu nhập (<a href="/admin/products/inventory/import/list">Phiếu nhập kho</a>).
-  + Xuất kho: Xem và tạo phiếu xuất (<a href="/admin/products/inventory/export/list">Phiếu xuất kho</a>).
-  + Kiểm kê kho: Quản lý đợt kiểm kê (<a href="/admin/products/inventory/audit/list">Kiểm kê kho</a>).
-- Quản lý Đơn hàng: Duyệt đơn và trạng thái (<a href="/admin/orders">Quản lý Đơn hàng</a>).
+Sếp của bạn: Người sáng lập Veltrix. Rất tài năng và yêu cầu sự chính xác.
+HƯỚNG DẪN SỬ DỤNG TRANG QUẢN TRỊ (LUỒNG ADMIN) VÀ ROUTER:
+*(Lưu ý: Khi điều hướng hoặc nhắc đến trang nào, BẮT BUỘC dùng chính xác các URL dưới đây để làm href cho thẻ <a> hoặc làm tham số cho \`navigateFrontend\`)*
+- Trang chủ (Dashboard): <a href="/admin">Trang chủ</a>
+- Quản lý Sản phẩm:
+  + Danh sách: <a href="/admin/products">Sản phẩm</a>
+  + Thêm mới: <a href="/admin/products/create">Thêm sản phẩm</a>
+  + Chi tiết sản phẩm: <a href="/admin/products/detail/{slug}">Chi tiết</a> (BẮT BUỘC thay {slug} bằng slug của sản phẩm)
+  + CHỈNH SỬA SẢN PHẨM: <a href="/admin/products/update/{slug}">Chỉnh sửa</a> (BẮT BUỘC thay {slug} bằng slug của sản phẩm, VD: /admin/products/update/chuot-asus-p722)
+- Danh mục sản phẩm: Danh sách (<a href="/admin/categories">Danh mục</a>), Thêm (<a href="/admin/categories/create">Thêm</a>), Sửa (<a href="/admin/categories/update/{slug}">Sửa</a>).
+- Quản lý kho hàng: Nhập kho (<a href="/admin/products/inventory/import/list">Phiếu nhập</a>), Xuất kho (<a href="/admin/products/inventory/export/list">Phiếu xuất</a>), Kiểm kê (<a href="/admin/products/inventory/audit/list">Kiểm kê</a>).
+- Quản lý Đơn hàng: Danh sách (<a href="/admin/orders">Quản lý Đơn hàng</a>), Chi tiết đơn hàng (<a href="/admin/orders/{code}">Chi tiết đơn</a> - thay {code} bằng mã đơn).
 - Quản lý Khách hàng (Yêu cầu quyền view_users): Danh sách người mua (<a href="/admin/users">Khách hàng</a>).
 - CSKH: Khung chat hỗ trợ (<a href="/admin/chat">Trò chuyện</a>).
 - Tin tức & Danh mục: Viết bài (<a href="/admin/news">Tin tức</a>) và (<a href="/admin/new-categories">Danh mục tin</a>).
@@ -192,6 +201,48 @@ const createArticleTool = {
     }
 };
 
+const replyProductReviewsTool = {
+    name: "replyProductReviews",
+    description: "Sử dụng khi Sếp yêu cầu kiểm tra hoặc phản hồi các đánh giá. Nếu có từ khóa, sẽ tìm và tự động trả lời cho 1 sản phẩm. Nếu Sếp hỏi 'có đánh giá nào chưa trả lời không' thì set searchAll=true để hệ thống báo cáo danh sách. Nếu Sếp ra lệnh 'trả lời tất cả đi' thì set replyAll=true để hệ thống tự động chạy Auto-Pilot cho TẤT CẢ đánh giá trên toàn hệ thống.",
+    parameters: {
+        type: "OBJECT",
+        properties: {
+            keyword: { type: "STRING", description: "Tên hoặc từ khóa sản phẩm cần trả lời đánh giá (ví dụ: 'laptop asus', 'chuột gaming'). Để trống nếu duyệt toàn hệ thống." },
+            searchAll: { type: "BOOLEAN", description: "True nếu Sếp muốn quét toàn bộ hệ thống để tìm xem có đánh giá nào bị bỏ sót chưa trả lời không." },
+            replyAll: { type: "BOOLEAN", description: "True nếu Sếp ra lệnh tự động trả lời cho TẤT CẢ các đánh giá chưa xử lý trên toàn hệ thống." }
+        }
+    }
+};
+
+const executeDatabaseQueryTool = {
+    name: "executeDatabaseQuery",
+    description: "CÔNG CỤ TOÀN NĂNG: Sử dụng khi Sếp yêu cầu một lệnh liên quan đến Database (Tìm kiếm, Thống kê, Xóa, Cập nhật dữ liệu) mà KHÔNG có công cụ nào khác xử lý được. AI cần tự suy luận modelName, operation, queryJson và updateJson phù hợp với yêu cầu. LƯU Ý: Với các lệnh sửa/xoá, hệ thống sẽ tự động chặn lại và yêu cầu xác nhận lần cuối từ Sếp (trừ khi Sếp đã nói 'chắc chắn' hoặc 'yes').",
+    parameters: {
+        type: "OBJECT",
+        properties: {
+            modelName: { type: "STRING", description: "Tên bảng dữ liệu Mongoose cần thao tác. Phải là một trong: 'Product', 'ProductPreview', 'Category', 'Order', 'User', 'Account', 'News', 'Voucher', 'InventoryTransaction', 'InventoryAudit', 'System', 'Setting'." },
+            operation: { type: "STRING", description: "Loại thao tác cần thực hiện. Phải là một trong: 'find', 'countDocuments', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany'." },
+            queryJson: { type: "STRING", description: "Chuỗi JSON chứa điều kiện query (ví dụ: '{\"deleted\": false, \"price\": {\"$lt\": 500}}'). Để rỗng '{}' nếu muốn tác động tất cả." },
+            updateJson: { type: "STRING", description: "Chuỗi JSON chứa dữ liệu cần cập nhật (ví dụ: '{\"$set\": {\"status\": \"inactive\"}}'). Chỉ dùng cho lệnh update." },
+            confirmed: { type: "BOOLEAN", description: "Truyền true NẾU Sếp đã XÁC NHẬN rõ ràng việc thay đổi/xoá dữ liệu trong cuộc hội thoại này. Truyền false nếu đây là lần đầu tiên AI định chạy lệnh sửa/xoá này." }
+        },
+        required: ["modelName", "operation", "queryJson"]
+    }
+};
+
+const navigateFrontendTool = {
+    name: "navigateFrontend",
+    description: "Sử dụng khi AI muốn chủ động chuyển hướng màn hình của Sếp (trên giao diện web) sang một trang cụ thể nào đó (Ví dụ: danh sách sản phẩm, chi tiết đơn hàng). AI phải tự suy luận URL dựa trên hệ thống router. CHÚ Ý: Trang chi tiết sản phẩm sử dụng SLUG, KHÔNG PHẢI _id (Ví dụ đúng: '/admin/products/detail/pc-gaming-abc', Sai: '/admin/products/detail/60d...'). Sếp có thể yêu cầu mở một sản phẩm vừa được AI tìm thấy.",
+    parameters: {
+        type: "OBJECT",
+        properties: {
+            url: { type: "STRING", description: "Đường dẫn URL muốn chuyển đến (ví dụ: '/admin/products', '/admin/orders/detail/123')." },
+            reason: { type: "STRING", description: "Lý do vì sao AI muốn chuyển trang, để giải thích cho Sếp." }
+        },
+        required: ["url"]
+    }
+};
+
 module.exports.askGeminiAdmin = async (userMessage, dashboardContext = "", chatHistory = "", permissionsContext = "", systemPermissionsContext = "", processOrderCallback = null, uploadedImages = [], documentContext = "") => {
     try {
         let systemConfig = await System.findOne({});
@@ -217,7 +268,7 @@ module.exports.askGeminiAdmin = async (userMessage, dashboardContext = "", chatH
             model: aiModel,
             generationConfig: { temperature: 0.8 },
             tools: [
-                { functionDeclarations: [processOrderTool, toggleAutoProcessOrdersTool, getDashboardStatsTool, generatePDFTool, getOrderDetailsTool, getExportReceiptDetailsTool, findProductTool, createArticleTool] }
+                { functionDeclarations: [processOrderTool, toggleAutoProcessOrdersTool, getDashboardStatsTool, generatePDFTool, getOrderDetailsTool, getExportReceiptDetailsTool, findProductTool, createArticleTool, replyProductReviewsTool, executeDatabaseQueryTool, navigateFrontendTool] }
             ]
         });
 
@@ -251,6 +302,7 @@ module.exports.askGeminiAdmin = async (userMessage, dashboardContext = "", chatH
             if (functionResult && functionResult.action) {
                 extraData.action = functionResult.action;
                 extraData.draftPayload = functionResult.draftPayload;
+                if (functionResult.navigateUrl) extraData.navigateUrl = functionResult.navigateUrl;
             }
 
             // Gửi kết quả về cho AI để nó tiếp tục suy nghĩ hoặc gọi hàm tiếp theo
@@ -267,7 +319,8 @@ module.exports.askGeminiAdmin = async (userMessage, dashboardContext = "", chatH
             type: "text",
             text: response.text() || "Đã hoàn tất xử lý (Nhưng không có tin nhắn phản hồi).",
             action: extraData.action,
-            draftPayload: extraData.draftPayload
+            draftPayload: extraData.draftPayload,
+            navigateUrl: extraData.navigateUrl
         };
     } catch (error) {
         console.error("Lỗi khi gọi Gemini API Admin:", error);

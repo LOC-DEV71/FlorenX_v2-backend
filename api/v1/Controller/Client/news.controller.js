@@ -5,13 +5,24 @@ const NewsCategory = require("../../Models/news.category.model");
 module.exports.getByCategorySlug = async (req, res) => {
     try {
         const { slug } = req.params;
-        const news = await News.find({
+        const { featured, limit } = req.query;
+        
+        let query = {
             deleted: false,
             slug_category: slug,
             status: "published"
-        })
-        .select("-content")
-        .sort({ createdAt: -1 }).limit(4);
+        };
+        if (featured === "true") {
+            query.featured = "yes";
+        }
+        
+        let mongoQuery = News.find(query).select("-content").sort({ createdAt: -1 });
+        
+        if (limit) {
+            mongoQuery = mongoQuery.limit(parseInt(limit));
+        }
+        
+        const news = await mongoQuery;
 
         return res.status(200).json({
             code: true, 

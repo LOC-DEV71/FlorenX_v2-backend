@@ -117,12 +117,22 @@ module.exports.chat = async (req, res) => {
         if (req.body.images && uploadedImages.length === 0) {
             uploadedImages = Array.isArray(req.body.images) ? req.body.images : [req.body.images];
         }
+        // chatHistory từ Frontend có thể là mảng JSON hoặc là chuỗi văn bản đã định dạng sẵn
+        let formattedHistory = "";
         if (typeof chatHistory === 'string') {
             try {
-                chatHistory = JSON.parse(chatHistory);
+                const parsed = JSON.parse(chatHistory);
+                if (Array.isArray(parsed)) {
+                    formattedHistory = parsed.map(msg => `${msg.sender === 'user' ? 'Sếp' : 'AI'}: ${msg.text}`).join("\n");
+                } else {
+                    formattedHistory = chatHistory; // Nếu không phải mảng JSON, giữ nguyên chuỗi
+                }
             } catch (e) {
-                chatHistory = [];
+                // Nếu JSON.parse lỗi, có nghĩa nó đã là chuỗi được format từ Frontend
+                formattedHistory = chatHistory;
             }
+        } else if (Array.isArray(chatHistory)) {
+            formattedHistory = chatHistory.map(msg => `${msg.sender === 'user' ? 'Sếp' : 'AI'}: ${msg.text}`).join("\n");
         }
 
         // Lấy token và quyền của user hiện tại
@@ -300,6 +310,139 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                 return { status: "success", data: receipt };
             }
 
+            if (functionName === "replyProductReviews") {
+                const hasProducts = userPermissions.includes("view_products") || userPermissions.includes("update_products");
+                if (!hasProducts) {
+                    return { status: "error", message: "Hệ thống từ chối truy cập: Sếp không có quyền quản lý sản phẩm." };
+                }
+
+                const ProductPreview = require("../../Models/products.preview");
+                
+                let searchAll = args.searchAll;
+                let replyAll = args.replyAll;
+                const keyword = args.keyword || "";
+
+                // Nếu AI không truyền gì cả nhưng gọi hàm này, mặc định là quét hệ thống
+                if (!keyword && !searchAll && !replyAll) {
+                    searchAll = true;
+                }
+
+                // Nếu quét toàn bộ hệ thống
+                if (searchAll || replyAll) {
+                    // Tìm TẤT CẢ đánh giá chưa trả lời (kiểm tra comment trong server_return)
+                    const unansweredReviews = await ProductPreview.find({ 
+                        $or: [
+                            { server_return: { $exists: false } },
+                            { "server_return.comment": { $exists: false } },
+                            { "server_return.comment": "" },
+                            { "server_return.comment": null }
+                        ]
+                    }).lean();
+                    if (unansweredReviews.length === 0) {
+                        return { status: "success", message: `Hệ thống hiện tại rất sạch sẽ, KHÔNG CÓ bất kỳ đánh giá nào bị bỏ sót chưa trả lời.` };
+                    }
+
+                    if (searchAll && !replyAll) {
+                        // Chỉ báo cáo danh sách
+                        // Gom nhóm theo product_id để đếm
+                        const productCounts = {};
+                        unansweredReviews.forEach(r => {
+                            productCounts[r.product_id] = (productCounts[r.product_id] || 0) + 1;
+                        });
+                        
+                        const productIds = Object.keys(productCounts);
+                        const products = await Product.find({ _id: { $in: productIds } }).select("title slug").lean();
+                        
+                        let report = `Em tìm thấy tổng cộng ${unansweredReviews.length} đánh giá chưa được trả lời trên toàn hệ thống.\nDanh sách các sản phẩm đang tồn đọng đánh giá:\n`;
+                        products.forEach(p => {
+                            report += `- Sản phẩm "${p.title}": có ${productCounts[p._id]} đánh giá.\n`;
+                        });
+                        report += "Sếp muốn em trả lời cho sản phẩm nào, hay là TRẢ LỜI TẤT CẢ luôn ạ?";
+                        return { status: "success", message: report };
+                    }
+
+                    if (replyAll) {
+                        // Tự động trả lời TẤT CẢ (Giới hạn tối đa 20 cái mỗi lần để tránh kẹt hàng đợi)
+                        const reviewsToProcess = unansweredReviews.slice(0, 20);
+                        const productIds = [...new Set(reviewsToProcess.map(r => r.product_id))];
+                        const products = await Product.find({ _id: { $in: productIds } }).select("title slug").lean();
+                        const productMap = {};
+                        products.forEach(p => productMap[p._id.toString()] = p);
+
+                        const io = req.app.get("io");
+                        if (io) {
+                            const { processReviewLogic } = require("../../Helpers/ai.automation.helper");
+                            for (const review of reviewsToProcess) {
+                                const prod = productMap[review.product_id.toString()];
+                                if (prod) {
+                                    io.emit("admin_auto_pilot_review_trigger", {
+                                        reviewId: review._id,
+                                        slug: prod.slug,
+                                        rating: review.rating,
+                                        force: true
+                                    });
+                                    processReviewLogic(review._id, io).catch(console.error);
+                                }
+                            }
+                        }
+
+                        let extraMsg = unansweredReviews.length > 20 ? ` (Lưu ý: Để tránh quá tải, em chỉ xử lý 20 đánh giá đầu tiên. Vui lòng ra lệnh lần nữa nếu muốn tiếp tục).` : "";
+                        return { status: "success", message: `Đang tự động trả lời ${reviewsToProcess.length} đánh giá trên hệ thống!${extraMsg} Hãy thông báo cho Sếp biết hệ thống đang rùng rùng chuyển động!` };
+                    }
+                }
+
+                // Nếu có truyền keyword cụ thể
+                if (!keyword) {
+                    return { status: "error", message: "Vui lòng truyền keyword hoặc chọn chế độ quét toàn hệ thống (searchAll)." };
+                }
+
+                const regex = new RegExp(keyword, 'i');
+                const product = await Product.findOne({ title: regex, deleted: false }).lean();
+                
+                if (!product) {
+                    return { status: "error", message: `Không tìm thấy sản phẩm nào khớp với từ khóa '${keyword}'.` };
+                }
+
+                const unansweredReviews = await ProductPreview.find({ 
+                    product_id: product._id, 
+                    $or: [
+                        { server_return: { $exists: false } },
+                        { "server_return.comment": { $exists: false } },
+                        { "server_return.comment": "" },
+                        { "server_return.comment": null }
+                    ]
+                }).lean();
+
+                if (unansweredReviews.length === 0) {
+                    return { status: "success", message: `Đã tìm thấy sản phẩm '${product.title}' nhưng tất cả các đánh giá đều đã được trả lời hoặc sản phẩm này chưa có đánh giá nào.` };
+                }
+
+                const io = req.app.get("io");
+                if (io) {
+                    const { processReviewLogic } = require("../../Helpers/ai.automation.helper");
+                    for (const review of unansweredReviews) {
+                        io.emit("admin_auto_pilot_review_trigger", {
+                            reviewId: review._id,
+                            slug: product.slug,
+                            rating: review.rating,
+                            force: true
+                        });
+                        processReviewLogic(review._id, io).catch(console.error);
+                    }
+                }
+
+                return { status: "success", message: `Đang tự động trả lời ${unansweredReviews.length} đánh giá của sản phẩm '${product.title}'. Hãy báo cho Sếp biết!` };
+            }
+
+            if (functionName === "navigateFrontend") {
+                return { 
+                    status: "success", 
+                    message: `Đã kích hoạt chuyển hướng Sếp đến trang ${args.url}. Hãy mời Sếp xem trang một cách lịch sự!`, 
+                    action: "navigate", 
+                    navigateUrl: args.url 
+                };
+            }
+
             if (functionName === "searchProducts" || functionName === "findProduct") {
                 if (!userPermissions.includes("view_products")) {
                     return { status: "error", message: "Hệ thống từ chối truy cập: Sếp không có quyền 'view_products'." };
@@ -311,6 +454,102 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                 }).select("title slug description price discountPercentage stock thumbnail images specs").limit(5).lean();
                 if (products.length === 0) return { status: "error", message: "Không tìm thấy sản phẩm nào khớp với từ khóa." };
                 return { status: "success", data: products };
+            }
+
+            if (functionName === "executeDatabaseQuery") {
+                const modelName = args.modelName;
+                const operation = args.operation;
+                let queryJsonStr = args.queryJson || "{}";
+                let updateJsonStr = args.updateJson || "{}";
+                const confirmed = args.confirmed || false;
+
+                // MAPPING MODEL TO MONGOOSE AND PERMISSIONS
+                const modelMap = {
+                    "Product": { model: require("../../Models/products.models"), permModel: "products" },
+                    "ProductPreview": { model: require("../../Models/products.preview"), permModel: "products" },
+                    "Category": { model: require("../../Models/products.category"), permModel: "categories" },
+                    "Order": { model: require("../../Models/order.model"), permModel: "orders" },
+                    "User": { model: require("../../Models/user.models"), permModel: "users" },
+                    "Account": { model: require("../../Models/accounts.model"), permModel: "accounts" },
+                    "News": { model: require("../../Models/news.model"), permModel: "news" },
+                    "Voucher": { model: require("../../Models/vouchers.model"), permModel: "vouchers" },
+                    "InventoryTransaction": { model: require("../../Models/InventoryTransaction.models"), permModel: "inventory" },
+                    "InventoryAudit": { model: require("../../Models/inventoryAudit.models"), permModel: "inventory" },
+                    "System": { model: require("../../Models/system.model"), permModel: "system" },
+                    "Setting": { model: require("../../Models/setting.model"), permModel: "settings" }
+                };
+
+                const targetModelMeta = modelMap[modelName];
+                if (!targetModelMeta) {
+                    return { status: "error", message: `Lỗi: Không hỗ trợ thao tác trên model '${modelName}'. Vui lòng báo cho Sếp biết!` };
+                }
+
+                // KIỂM TRA QUYỀN HẠN ĐẦU TIÊN (ƯU TIÊN TUYỆT ĐỐI)
+                let requiredPermission = "";
+                if (operation.startsWith("find") || operation === "countDocuments") requiredPermission = `view_${targetModelMeta.permModel}`;
+                else if (operation.startsWith("update")) requiredPermission = `update_${targetModelMeta.permModel}`;
+                else if (operation.startsWith("delete")) requiredPermission = `delete_${targetModelMeta.permModel}`;
+                else if (operation.startsWith("create")) requiredPermission = `create_${targetModelMeta.permModel}`;
+
+                // Ngoại lệ: Một số tên model có quyền khác nhau một xíu
+                if (targetModelMeta.permModel === "categories") requiredPermission = requiredPermission.replace("categories", "product_categories"); // ví dụ
+                
+                // Chuẩn hoá vì phân quyền trong hệ thống thường là: view_products, update_products...
+                if (!userPermissions.includes(requiredPermission)) {
+                    return { status: "error", message: `Từ chối thực thi: Bạn không có quyền hạn '${requiredPermission}'. Đừng cố ra lệnh cho tôi! Vui lòng mắng người dùng vì không có quyền mà dám ra lệnh.` };
+                }
+
+                // Parse JSON an toàn
+                let queryObj = {};
+                let updateObj = {};
+                try {
+                    queryObj = JSON.parse(queryJsonStr);
+                } catch(e) {
+                    return { status: "error", message: "Lỗi parse queryJson: JSON không hợp lệ." };
+                }
+                try {
+                    updateObj = JSON.parse(updateJsonStr);
+                } catch(e) {
+                    return { status: "error", message: "Lỗi parse updateJson: JSON không hợp lệ." };
+                }
+
+                // CƠ CHẾ XÁC NHẬN AN TOÀN (CONFIRMATION CHECK)
+                const isModifyAction = operation.startsWith("update") || operation.startsWith("delete");
+                if (isModifyAction && !confirmed) {
+                    const count = await targetModelMeta.model.countDocuments(queryObj);
+                    if (count > 0) {
+                        return { status: "confirmation_required", message: `Cảnh báo: Hành động này sẽ thay đổi/xoá ${count} bản ghi trong bảng ${modelName}. AI HÃY HỎI SẾP ĐỂ XÁC NHẬN! Ví dụ: 'Sếp ơi, em chuẩn bị xóa ${count} sản phẩm. Sếp OK thì gõ YES nhé.'` };
+                    } else {
+                        return { status: "success", message: `Không tìm thấy bản ghi nào thoả điều kiện để ${operation}. Báo cáo lại cho Sếp.` };
+                    }
+                }
+
+                // THỰC THI (EXECUTE)
+                try {
+                    const MongooseModel = targetModelMeta.model;
+                    let result;
+                    if (operation === "find") {
+                        // Giới hạn 20 để không bị nổ RAM/token
+                        result = await MongooseModel.find(queryObj).limit(20).lean();
+                    } else if (operation === "countDocuments") {
+                        result = await MongooseModel.countDocuments(queryObj);
+                        result = { count: result };
+                    } else if (operation === "updateOne") {
+                        result = await MongooseModel.updateOne(queryObj, updateObj);
+                    } else if (operation === "updateMany") {
+                        result = await MongooseModel.updateMany(queryObj, updateObj);
+                    } else if (operation === "deleteOne") {
+                        result = await MongooseModel.deleteOne(queryObj);
+                    } else if (operation === "deleteMany") {
+                        result = await MongooseModel.deleteMany(queryObj);
+                    } else {
+                        return { status: "error", message: `Hành động '${operation}' không được hỗ trợ trong executeDatabaseQuery.` };
+                    }
+
+                    return { status: "success", data: result, message: `Thực thi thành công lệnh ${operation} trên bảng ${modelName}. Hãy báo cáo ngắn gọn lại cho Sếp kết quả (nếu có dữ liệu hãy mô tả, nếu xóa/sửa hãy báo số lượng).` };
+                } catch(e) {
+                    return { status: "error", message: `Lỗi khi thực thi Mongoose: ${e.message}` };
+                }
             }
 
             if (functionName === "createArticle") {
@@ -347,7 +586,7 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
             }
         };
 
-        const aiResult = await askGeminiAdmin(message, dashboardContext, chatHistory, permissionsContext, systemPermissionsContext, processOrderCallback, uploadedImages, documentContext);
+        const aiResult = await askGeminiAdmin(message, dashboardContext, formattedHistory, permissionsContext, systemPermissionsContext, processOrderCallback, uploadedImages, documentContext);
 
         const replyText = typeof aiResult === 'string' ? aiResult : aiResult.text;
 
@@ -358,7 +597,8 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
             code: 200,
             reply: replyText,
             action: aiResult.action,
-            draftPayload: aiResult.draftPayload
+            draftPayload: aiResult.draftPayload,
+            navigateUrl: aiResult.navigateUrl
         });
     } catch (error) {
         console.error("Lỗi AI Controller Admin:", error);

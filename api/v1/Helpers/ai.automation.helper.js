@@ -58,7 +58,7 @@ async function processAllOrdersLogic() {
         let failCount = 0;
         let failMessages = [];
         let successCodes = [];
-
+        
         for (const order of pendingOrders) {
             let enoughStock = true;
             for (const prod of order.products) {
@@ -136,29 +136,16 @@ Chỉ trả về nội dung câu trả lời, không có định dạng markdown
         const result = await model.generateContent(prompt);
         let aiResponse = result.response.text().trim();
 
-        // Cập nhật review
-        const server_return = {
-            admin_name: "Veltrix AI",
-            role: "Trợ lý Hệ thống",
-            avatar: systemConfig.ai?.botAvatar || "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/1024px-ChatGPT_logo.svg.png",
-            comment: aiResponse,
-            createdAt: Date.now()
-        };
-
-        await ProductPreview.updateOne(
-            { _id: reviewId },
-            { server_return: server_return }
-        );
-
-        // Phát sự kiện để cập nhật UI Admin (nếu họ đang xem chi tiết sản phẩm đó)
+        // KHÔNG lưu DB ở đây! Gửi AI text qua socket để FE typing animation rồi gọi API lưu
         if (io) {
-            io.emit("server_return_admin_product_preview", {
-                id: reviewId,
-                server_return: server_return
+            io.emit("admin_auto_pilot_review_ai_response", {
+                reviewId: String(reviewId),
+                aiText: aiResponse,
+                botAvatar: systemConfig.ai?.botAvatar || "https://upload.wikimedia.org/wikipedia/commons/thumb/0/04/ChatGPT_logo.svg/1024px-ChatGPT_logo.svg.png"
             });
         }
 
-        return { status: "success", message: "AI đã trả lời thành công" };
+        return { status: "success", message: "AI đã sinh câu trả lời", aiText: aiResponse };
     } catch (e) {
         return { status: "error", message: `AI Error: ${e.message}` };
     }
