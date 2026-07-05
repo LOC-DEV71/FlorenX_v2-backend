@@ -9,6 +9,10 @@ const roomChatSchema = new mongoose.Schema(
     admin_ids: {
       type: [String],
       default: []   
+    },
+    unreadAdmin: {
+      type: Number,
+      default: 0
     }
   },
   { timestamps: true }

@@ -122,7 +122,7 @@ module.exports.askGemini = async (userMessage, categoriesContext = "", productsC
 
         // Lấy model từ DB
         const aiModel = systemConfig.ai?.model || "gemini-1.5-flash";
-        console.log("Model AI đang dùng: ", aiModel)
+        console.log("User use gemini phiên bản: ", aiModel)
 
         // Kiểm tra xem đã cấu hình API Key chưa
         if (!systemConfig.ai?.apiKey) {

@@ -96,46 +96,33 @@ module.exports.streamUploadAvatar = async (req, res, next) => {
 module.exports.streamUploadSetting = async (req, res, next) => {
   try {
     await configureCloudinary();
-    if (req.files?.logo?.length) {
-      const result = await uploadStream(req.files.logo[0]);
-      req.body.logo = result.secure_url;
-    }
-
-    if (req.files?.favicon?.length) {
-      const result = await uploadStream(req.files.favicon[0]);
-      req.body.favicon = result.secure_url;
-    }
-
-    if (req.files?.bannerDesktop?.length) {
-      const result = await uploadStream(req.files.bannerDesktop[0]);
-      req.body.bannerDesktop = result.secure_url;
-    }
-
-    if (req.files?.bannerMobile?.length) {
-      const result = await uploadStream(req.files.bannerMobile[0]);
-      req.body.bannerMobile = result.secure_url;
-    }
-
-    // upload section hero images
-    if (req.files?.sectionHeroImages?.length) {
-      const results = await Promise.all(
-        req.files.sectionHeroImages.map((file) => uploadStream(file))
-      );
-      req.body.sectionHeroUploadedLinks = results.map((item) => item.secure_url);
-    } else {
-      req.body.sectionHeroUploadedLinks = [];
-    }
-
-    // upload section hero slider images
-    if (req.files?.sectionHeroSliderImages?.length) {
-      const results = await Promise.all(
-        req.files.sectionHeroSliderImages.map((file) => uploadStream(file))
-      );
-      req.body.sectionHeroSliderUploadedLinks = results.map(
-        (item) => item.secure_url
-      );
-    } else {
-      req.body.sectionHeroSliderUploadedLinks = [];
+    
+    if (req.files && Array.isArray(req.files)) {
+      const uploadPromises = req.files.map(async (file) => {
+        // We can check if it's a video or image based on mimetype or fieldname
+        let resource_type = "image";
+        if (file.mimetype.startsWith("video/") || file.fieldname.includes("Video")) {
+          resource_type = "video";
+        }
+        
+        return new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { resource_type },
+            (error, result) => {
+              if (result) {
+                // Attach the result back to req.body with the fieldname
+                req.body[file.fieldname] = result.secure_url;
+                resolve();
+              } else {
+                reject(error);
+              }
+            }
+          );
+          streamifier.createReadStream(file.buffer).pipe(stream);
+        });
+      });
+      
+      await Promise.all(uploadPromises);
     }
 
     next();

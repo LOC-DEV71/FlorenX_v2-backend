@@ -24,6 +24,9 @@ module.exports.index = async (req, res) => {
             case "shipped":
                 find.status= "shipped"
                 break;
+            case "suspicious":
+                find.status= "suspicious"
+                break;
         
             default:
                 break;
@@ -41,9 +44,10 @@ module.exports.index = async (req, res) => {
         const pagination = paginationHelper.pagination(countDocuments, req.query);
 
         const doneOrder = await Orders.find({status: "done"}).countDocuments();
-        const pendingOrder = await Orders.find({status: "peinding"}).countDocuments();
+        const pendingOrder = await Orders.find({status: "pending"}).countDocuments();
         const comfirmOrder = await Orders.find({status: "confirmed"}).countDocuments();
         const shippedOrder = await Orders.find({status: "shipped"}).countDocuments();
+        const suspiciousOrder = await Orders.find({status: "suspicious"}).countDocuments();
 
         let sortObj = { createdAt: -1 };
         if (req.query.sort === "price-asc") sortObj = { finalPrice: 1 };
@@ -54,7 +58,7 @@ module.exports.index = async (req, res) => {
             .limit(pagination.limit)
             .skip(pagination.skip);
 
-        res.status(200).json({ code: true, orders, pagination, status: {doneOrder, pendingOrder, comfirmOrder, shippedOrder} });
+        res.status(200).json({ code: true, orders, pagination, status: {doneOrder, pendingOrder, comfirmOrder, shippedOrder, suspiciousOrder} });
     } catch (error) {
         res.status(400).json({ message: `Lỗi: ${error}`, code: false });
     }
@@ -65,7 +69,7 @@ module.exports.updateStatus = async (req, res) => {
         const { ids, action } = req.body;
     
 
-        const validStatuses = ["pending", "confirmed", "shipped", "done", "cancel"];
+        const validStatuses = ["pending", "confirmed", "shipped", "done", "cancel", "suspicious"];
 
         if (!validStatuses.includes(action)) {
             return res.status(400).json({ code: false, message: "Trạng thái không hợp lệ" });

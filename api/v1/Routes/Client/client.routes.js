@@ -13,6 +13,7 @@ const ordersRoutes = require("./orders.routes");
 const productPreviewRoutes = require("./product.preview.routes");
 const aiRoutes = require("./ai.routes");
 const settingsRoutes = require("./settings.routes");
+const tiersRoutes = require("./tiers.routes");
 
 router.use("/product-categories", productCategoriesRoutes)
 router.use("/news", newsRoutes)
@@ -26,5 +27,6 @@ router.use("/orders", ordersRoutes)
 router.use("/product-preview", productPreviewRoutes)
 router.use("/ai", aiRoutes)
 router.use("/settings", settingsRoutes)
+router.use("/member-tiers", tiersRoutes)
 
 module.exports = router;

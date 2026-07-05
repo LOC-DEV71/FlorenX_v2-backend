@@ -23,6 +23,7 @@ const productPreviewRoutes = require("./product.preview.routes.js")
 const systemRoutes = require("./system.routes.js")
 const dashboardRoutes = require("./dashboard.routes.js");
 const aiRoutes = require("./ai.routes.js");
+const tiersRoutes = require("./tiers.routes.js");
 const activityLogger = require("../../Middlewares/admin/activityLogger.js");
 
 // Bật giám sát ngầm cho mọi routes bên trong admin
@@ -50,5 +51,6 @@ router.use("/notifications", notificationsRoutes);
 router.use("/product-preview", productPreviewRoutes);
 router.use("/system", systemRoutes);
 router.use("/ai", aiRoutes);
+router.use("/member-tiers", tiersRoutes);
 
 module.exports = router;

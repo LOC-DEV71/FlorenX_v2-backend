@@ -76,12 +76,17 @@ module.exports.history = async (req, res) => {
 };
 
 // [POST] /api/v1/admin/ai/chat
+// Đây là ĐIỂM BẮT ĐẦU (GỐC) CỦA MỌI CUỘC TRÒ CHUYỆN. Khi Admin gõ tin nhắn, Frontend sẽ gọi API này.
 module.exports.chat = async (req, res) => {
     try {
+        // 1. NHẬN DỮ LIỆU TỪ FRONTEND: Lấy tin nhắn và lịch sử trò chuyện
         let { message, chatHistory } = req.body;
         
         let uploadedImages = [];
         let documentContext = "";
+
+        // 2. XỬ LÝ FILE ĐÍNH KÈM (Hình ảnh, PDF, Word, Txt)
+        // Nếu Sếp có tải file lên, hệ thống sẽ đọc file đó tại đây.
 
         if (req.files && req.files.length > 0) {
             for (const file of req.files) {
@@ -139,7 +144,8 @@ module.exports.chat = async (req, res) => {
             formattedHistory = chatHistory.map(msg => `${msg.sender === 'user' ? 'Sếp' : 'AI'}: ${msg.text}`).join("\n");
         }
 
-        // Lấy token và quyền của user hiện tại
+        // 4. KIỂM TRA ĐỊNH DANH VÀ QUYỀN HẠN (Phân biệt Sếp và Nhân viên)
+        // Lấy token từ Cookie để biết ai đang chat
         const token = req.cookies.token;
         let userPermissions = [];
         let userId = "admin_session";
@@ -162,6 +168,8 @@ module.exports.chat = async (req, res) => {
             await AiMessageAdmin.create({ sessionId: `admin_${userId}`, sender: "user", text: message });
         }
         
+        // 5. ĐỊNH HÌNH THÁI ĐỘ CỦA AI DỰA VÀO QUYỀN (permissionsContext)
+        // Nếu quyền ít -> AI sẽ khinh bỉ. Nếu quyền nhiều -> AI sẽ nịnh nọt.
         let permissionsContext = "";
         if (userPermissions.length === 0) {
             permissionsContext = "KHÔNG CÓ QUYỀN GÌ CẢ (CHỈ LÀ NHÂN VIÊN QUÈN / THỰC TẬP SINH)";
@@ -171,7 +179,8 @@ module.exports.chat = async (req, res) => {
             permissionsContext = userPermissions.join(", ");
         }
 
-        // Lấy danh sách toàn bộ các quyền mà hệ thống hỗ trợ
+        // 6. LẤY TOÀN BỘ QUYỀN CỦA HỆ THỐNG (systemPermissionsContext)
+        // Trích xuất tất cả các quyền có thể có để AI làm "Từ điển" dò quyền.
         const allPermissionDocs = await Permission.find({}).lean();
         const systemPermissionsContext = allPermissionDocs.map(g => g.permissions.map(p => p.value)).flat().join(", ");
 
@@ -199,6 +208,9 @@ module.exports.chat = async (req, res) => {
             }
         }
 
+
+        // 8. TẠO "GIÁC QUAN" DASHBOARD CHO AI (dashboardContext)
+        // Chặn xem báo cáo nếu không có quyền view_dashboard.
         let dashboardContext = `
 ${currentUserInfo}
 DỮ LIỆU TỔNG QUAN:
@@ -206,6 +218,7 @@ DỮ LIỆU TỔNG QUAN:
 - DANH SÁCH NHÂN SỰ ĐANG ONLINE (LƯU Ý QUAN TRỌNG: NẾU HỌ HỎI 'CÓ ADMIN NÀO ONLINE KHÔNG' HOẶC 'CÓ AI ONLINE KHÔNG', BẠN PHẢI ĐỌC HẾT TẤT CẢ DANH SÁCH SAU ĐÂY VÀ KHÔNG ĐƯỢC BỎ SÓT BẤT KỲ AI DÙ HỌ CHỈ LÀ CSKH): ${onlineContext}
 `;
 
+        // Nếu có quyền view_dashboard, bắt đầu truy xuất dữ liệu Real-time (Đơn hàng, Doanh thu, Khách hàng)
         if (userPermissions.includes("view_dashboard") || userPermissions.includes("view_orders")) {
             // Thu thập tổng quan hệ thống để làm Context
             const totalOrders = await Order.countDocuments();
@@ -262,9 +275,11 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                 }
                 
                 if (args.processAll === true) {
-                    return await processAllOrdersLogic();
+                    const io = req.app.get("io");
+                    return await processAllOrdersLogic(io);
                 } else if (args.orderCode) {
-                    return await processOrderLogic(args.orderCode);
+                    const io = req.app.get("io");
+                    return await processOrderLogic(args.orderCode, io);
                 } else {
                     return { status: "error", message: "Không rõ lệnh. Vui lòng cung cấp mã đơn hàng cụ thể hoặc yêu cầu duyệt tất cả." };
                 }
@@ -288,6 +303,11 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                     { _id: system._id },
                     { $set: { "ai.autoProcessOrders": args.status } }
                 );
+
+                const io = req.app.get("io");
+                if (io) {
+                    io.emit("admin_toggle_auto_pilot", { enabled: args.status });
+                }
                 
                 return { status: "success", message: `Đã ${args.status ? "BẬT" : "TẮT"} chế độ duyệt đơn tự động thành công.` };
             }
@@ -335,6 +355,83 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                 const receipt = await InventoryTransaction.findOne({ ref_id: args.receiptCode }).populate("product_id", "title").populate("warehouse_id", "title").lean();
                 if (!receipt) return { status: "error", message: "Không tìm thấy phiếu xuất kho này." };
                 return { status: "success", data: receipt };
+            }
+
+            if (functionName === "approveRestock") {
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
+                if (!isSuperAdmin && !userPermissions.includes("update_products") && !userPermissions.includes("system_management")) {
+                    return { status: "error", message: "Từ chối thực thi: Sếp cần có quyền quản lý sản phẩm hoặc hệ thống để duyệt nhập kho." };
+                }
+
+                const keyword = args.keyword;
+                const quantity = args.quantity || 50;
+
+                const product = await Product.findOne({ title: { $regex: keyword, $options: "i" }, deleted: false });
+                if (!product) {
+                    return { status: "error", message: `Không tìm thấy sản phẩm nào khớp với tên '${keyword}'.` };
+                }
+
+                const Warehouse = require("../../Models/warehouse.models");
+                const warehouse = await Warehouse.findOne({}); // Lấy kho đầu tiên
+                if (!warehouse) {
+                    return { status: "error", message: "Hệ thống chưa có kho hàng nào được thiết lập." };
+                }
+
+                const ProductStock = require("../../Models/product-stock.models");
+                let stock = await ProductStock.findOne({ product_id: product._id, warehouse_id: warehouse._id });
+                if (!stock) {
+                    stock = new ProductStock({ product_id: product._id, warehouse_id: warehouse._id, quantity: 0 });
+                }
+
+                stock.quantity += quantity;
+                await stock.save();
+
+                const InventoryTransaction = require("../../Models/InventoryTransaction.models");
+                const receiptId = `IMP-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+                await InventoryTransaction.create({
+                    type: "import",
+                    product_id: product._id,
+                    warehouse_id: warehouse._id,
+                    quantity: quantity,
+                    ref_id: receiptId,
+                    ref_name: `Phiếu nhập tự động do AI lên đơn`,
+                    note: `AI nhập kho tự động ${quantity} cái cho sản phẩm ${product.title} theo lệnh của Sếp.`
+                });
+
+                // Gửi email báo cáo
+                try {
+                    const { sendMail } = require("../../../../helper/send.email.helper");
+                    const currentAdmin = await Account.findById(userId);
+                    const emailTo = currentAdmin && currentAdmin.email ? currentAdmin.email : process.env.EMAIL_USER;
+                    const subject = `[Veltrix Auto-Restock] Yêu cầu nhập hàng: ${product.title}`;
+                    const html = `
+                        <h2>XÁC NHẬN YÊU CẦU NHẬP KHO</h2>
+                        <p>Hệ thống AI Veltrix-chan vừa tự động tạo yêu cầu nhập kho theo lệnh của quản trị viên.</p>
+                        <ul>
+                            <li><strong>Sản phẩm:</strong> ${product.title}</li>
+                            <li><strong>Số lượng nhập:</strong> ${quantity} cái</li>
+                            <li><strong>Mã phiếu nhập:</strong> ${receiptId}</li>
+                            <li><strong>Kho lưu trữ:</strong> ${warehouse.name || 'Kho mặc định'}</li>
+                        </ul>
+                        <p>Số tồn kho mới cập nhật trên hệ thống: ${stock.quantity}</p>
+                    `;
+                    sendMail(emailTo, subject, html).catch(err => console.error("Lỗi gửi email restock:", err));
+                } catch(e) {
+                    console.error("Mail error:", e);
+                }
+
+                return { status: "success", message: `Tuyệt vời! Em đã tạo Phiếu nhập kho (Mã: ${receiptId}) và cộng thành công ${quantity} cái '${product.title}' vào kho. Hệ thống cũng đã bắn email chốt đơn cho Sếp (đóng vai Nhà cung cấp) rồi nhé!` };
+            }
+
+            if (functionName === "triggerAutoMarketing") {
+                const isSuperAdmin = roleTitle.toLowerCase().includes("super admin") || roleTitle.toLowerCase().includes("superadmin");
+                if (!isSuperAdmin && !userPermissions.includes("system_management")) {
+                    return { status: "error", message: "Từ chối thực thi: Sếp cần có quyền 'system_management' để chạy chiến dịch dọn kho tự động." };
+                }
+
+                const io = req.app.get("io");
+                const { autoMarketingLogic } = require("../../Helpers/ai.automation.helper");
+                return await autoMarketingLogic(io);
             }
 
             if (functionName === "replyProductReviews") {
@@ -629,7 +726,12 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                 }
 
                 const newStatus = args.status;
-                await System.updateOne({}, { "ai.autoSystemMonitor": newStatus });
+                const system = await System.findOne({});
+                if (system) {
+                    await System.updateOne({ _id: system._id }, { $set: { "ai.autoSystemMonitor": newStatus } });
+                } else {
+                    await System.updateOne({}, { $set: { "ai.autoSystemMonitor": newStatus } });
+                }
                 
                 const io = req.app.get("io");
                 if (io) {
@@ -716,6 +818,18 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                     title: { $regex: keyword, $options: "i" },
                     deleted: false
                 }).select("title slug description price discountPercentage stock thumbnail images specs").limit(5).lean();
+                
+                // GIẢI PHÁP TIẾT KIỆM TOKEN CHO AI: Loại bỏ thẻ HTML và cắt ngắn nội dung 
+                // để tránh việc nhồi nhét hàng chục ngàn token vào lịch sử chat làm sập API.
+                products.forEach(p => {
+                    if (p.description) {
+                        p.description = p.description.replace(/<[^>]*>?/gm, '').substring(0, 800) + '...';
+                    }
+                    if (p.specs) {
+                        p.specs = p.specs.replace(/<[^>]*>?/gm, '').substring(0, 500) + '...';
+                    }
+                });
+
                 if (products.length === 0) return { status: "error", message: "Không tìm thấy sản phẩm nào khớp với từ khóa." };
                 return { status: "success", data: products };
             }
@@ -823,10 +937,42 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                     return { status: "error", message: "Hệ thống từ chối truy cập: Bạn không có quyền 'create_news'." };
                 }
                 try {
-                    // Chấp nhận ảnh thật từ findProduct HOẶC ảnh AI tự tạo từ Pollinations
                     let thumbnailUrl = args.thumbnail_url || "";
+                    let content = args.content || "";
+
+                    // Xử lý tự động thay thế ảnh ảo bằng ảnh thật nếu viết về một sản phẩm
+                    if (args.product_keyword) {
+                        const product = await Product.findOne({ 
+                            title: { $regex: args.product_keyword, $options: "i" },
+                            deleted: false
+                        }).lean();
+                        
+                        if (product) {
+                            if (product.thumbnail && !product.thumbnail.includes("loremflickr.com") && !product.thumbnail.includes("pollinations.ai")) {
+                                thumbnailUrl = product.thumbnail;
+                            }
+                            
+                            if (product.images && product.images.length > 0) {
+                                let imgIndex = 0;
+                                // Thay thế các link ảnh ảo do AI tạo ra bằng ảnh thật của sản phẩm
+                                content = content.replace(/<img[^>]*src=['"](?:https?:\/\/loremflickr\.com|https?:\/\/image\.pollinations\.ai)[^>]*>/gi, (match) => {
+                                    if (imgIndex < product.images.length) {
+                                        const realImg = product.images[imgIndex++];
+                                        return `<img src="${realImg}" style="width:100%;border-radius:8px;margin:16px 0" />`;
+                                    }
+                                    return match;
+                                });
+                                
+                                // Nếu chưa dùng hết ảnh thật, chèn thêm vào cuối bài viết
+                                if (imgIndex < product.images.length) {
+                                    const extraImagesHtml = product.images.slice(imgIndex).map(img => `<img src="${img}" style="width:100%;border-radius:8px;margin:16px 0" />`).join("");
+                                    content += extraImagesHtml;
+                                }
+                            }
+                        }
+                    }
+
                     if (thumbnailUrl.includes("pollinations.ai")) {
-                        // URL encode để tránh lỗi ký tự tiếng Việt hoặc khoảng trắng làm vỡ ảnh
                         thumbnailUrl = encodeURI(thumbnailUrl);
                     }
 
@@ -839,7 +985,7 @@ ${recentOrdersText || "Chưa có đơn hàng nào."}
                             title: args.title,
                             slug_category: args.slug_category,
                             description: args.description,
-                            content: args.content,
+                            content: content,
                             thumbnailUrl: thumbnailUrl,
                             status: "published",
                             featured: "yes"

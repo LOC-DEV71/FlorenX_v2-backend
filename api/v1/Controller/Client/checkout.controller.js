@@ -8,6 +8,7 @@ const formSendMail = require("../../../../helper/formSendMail");
 const jwtHelper = require("../../../../utils/jwt.utils");
 const Notification = require("../../Models/notification.model");
 const System = require("../../Models/system.model");
+const Tier = require("../../Models/tier.model");
 const { processOrderLogic } = require("../../Helpers/ai.automation.helper");
 
 const getPayPalClient = async () => {
@@ -95,6 +96,15 @@ module.exports.order = async (req, res) => {
           message: `Voucher đã hết lượt sử dụng`,
         });
       }
+
+      // Kiểm tra xem khách hàng (email) này đã dùng voucher này chưa
+      const hasUsedVoucher = await Orders.findOne({ email: email, voucher: voucherCode });
+      if (hasUsedVoucher) {
+        return res.status(400).json({
+          code: false,
+          message: `Bạn đã sử dụng mã giảm giá này rồi`,
+        });
+      }
     }
 
     const user = await Users.findOne({ email: email });
@@ -127,25 +137,11 @@ module.exports.order = async (req, res) => {
 
     let memberDiscount = 0;
     if (user && user.member) {
-      let tierConfig = null;
-      switch (user.member) {
-        case "diamond":
-          tierConfig = { rate: 0.15, max: 5000000, minOrder: 10000000 };
-          break;
-        case "gold":
-          tierConfig = { rate: 0.08, max: 3000000, minOrder: 10000000 };
-          break;
-        case "silver":
-          tierConfig = { rate: 0.06, max: 2000000, minOrder: 10000000 };
-          break;
-        case "bronze":
-          tierConfig = { rate: 0.05, max: 1000000, minOrder: 10000000 };
-          break;
-      }
+      const tierConfig = await Tier.findOne({ slug: user.member.toLowerCase(), deleted: false });
 
-      if (tierConfig && totalPrice >= tierConfig.minOrder) {
-        const discountAmount = totalPrice * tierConfig.rate;
-        memberDiscount = Math.min(discountAmount, tierConfig.max);
+      if (tierConfig && totalPrice >= tierConfig.minOrderValue) {
+        const discountAmount = totalPrice * (tierConfig.discountRate / 100);
+        memberDiscount = Math.min(discountAmount, tierConfig.maxDiscount);
       }
     }
 
@@ -154,6 +150,33 @@ module.exports.order = async (req, res) => {
 
     const orderCode = OrderCode(10);
 
+    // --- FRAUD DETECTION LOGIC ---
+    let isFraud = false;
+    let fraudReason = "";
+
+    const isCOD = pay === "Thanh toán khi nhận hàng" || pay === "cod";
+
+    if (isCOD && finalTotal >= 20000000) {
+        isFraud = true;
+        fraudReason = "Đơn COD có giá trị lớn bất thường (> 20 triệu VNĐ).";
+    }
+
+    if (!isFraud) {
+        const canceledCount = await Orders.countDocuments({ phone: phone, status: "cancel" });
+        if (canceledCount >= 5) {
+            isFraud = true;
+            fraudReason = `Khách hàng có lịch sử hủy đơn quá nhiều (${canceledCount} đơn).`;
+        }
+    }
+
+    if (!isFraud) {
+        const uniqueEmails = await Orders.distinct("email", { phone: phone });
+        if (uniqueEmails.length > 2) {
+            isFraud = true;
+            fraudReason = `Sử dụng cùng 1 số điện thoại với nhiều email khác nhau (${uniqueEmails.length} email).`;
+        }
+    }
+    // --- END FRAUD DETECTION LOGIC ---
 
     const orderData = {
       code: orderCode,
@@ -163,7 +186,7 @@ module.exports.order = async (req, res) => {
       email,
       voucher: voucherCode || null,
       pay,
-      status: "pending",
+      status: isFraud ? "suspicious" : "pending",
       products: products.map(item => ({
         productId: item.productId,
         title: item.title,
@@ -182,6 +205,14 @@ module.exports.order = async (req, res) => {
 
     const createOrder = new Orders(orderData);
     await createOrder.save();
+
+    // Cập nhật lại số lượt sử dụng voucher nếu có
+    if (voucherCode) {
+      await Vouchers.updateOne(
+        { code: voucherCode },
+        { $inc: { usedCount: 1 } }
+      );
+    }
 
     const createNotifi = new Notification({
       title: "Bạn có đơn hàng mới",
@@ -206,20 +237,28 @@ module.exports.order = async (req, res) => {
     // Luôn bắn Socket thông báo có đơn hàng mới cho Admin (để đổ chuông báo động)
     const io = req.app.get("io");
     if (io) {
+      if (isFraud) {
+         io.emit("admin_direct_message", {
+            message: `⚠️ [HỆ THỐNG AN NINH] Đơn hàng ${createOrder.code} vừa bị ĐÓNG BĂNG tự động vì nghi ngờ gian lận (Bom hàng). Lý do: ${fraudReason} Đề nghị Sếp hoặc bộ phận CSKH gọi điện xác minh trước khi duyệt!`,
+            from: "AI Veltrix-chan (An ninh)"
+         });
+      }
       // Bắn socket kèm theo flag force: true để báo đây là đơn mới, front-end tự hú còi
       io.emit("admin_auto_pilot_trigger", { orderCode: createOrder.code, force: true });
     }
 
     // AI Auto-Pilot Trigger: Xử lý duyệt đơn tự động ngầm
-    const system = await System.findOne({});
-    if (system && system.ai && system.ai.autoProcessOrders === true) {
+    if (!isFraud) {
+        const system = await System.findOne({});
+        if (system && system.ai && system.ai.autoProcessOrders === true) {
 
-      // Chạy bất đồng bộ, không cần await để khách hàng nhận được phản hồi ngay
-      processOrderLogic(createOrder.code).then(res => {
-        console.log(`[AI Auto-Pilot] Processed ${createOrder.code}:`, res);
-      }).catch(err => {
-        console.error(`[AI Auto-Pilot] Error on ${createOrder.code}:`, err);
-      });
+          // Chạy bất đồng bộ, không cần await để khách hàng nhận được phản hồi ngay
+          processOrderLogic(createOrder.code, io).then(res => {
+            console.log(`[AI Auto-Pilot] Processed ${createOrder.code}:`, res);
+          }).catch(err => {
+            console.error(`[AI Auto-Pilot] Error on ${createOrder.code}:`, err);
+          });
+        }
     }
 
     res.status(200).json({

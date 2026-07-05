@@ -8,8 +8,41 @@ const System = require("../Models/system.model");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { sendMail } = require("../../../helper/send.email.helper");
 
+// Hàm ngầm kiểm tra và cảnh báo tồn kho thấp
+async function checkLowStockAndNotify(productId, productTitle, currentStock, io) {
+    if (currentStock >= 5) return;
+    
+    try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        const exports = await InventoryTransaction.find({
+            product_id: productId,
+            type: "export",
+            createdAt: { $gte: thirtyDaysAgo }
+        });
+        
+        let soldQuantity = 0;
+        exports.forEach(exp => {
+            soldQuantity += (exp.quantity || 0);
+        });
+        
+        let suggestedAmount = soldQuantity;
+        if (suggestedAmount < 20) suggestedAmount = 20; // Nhập tối thiểu 20
+        
+        if (io) {
+            io.emit("admin_direct_message", {
+                message: `⚠️ [CẢNH BÁO KHO] Sản phẩm '${productTitle}' sắp cháy hàng (chỉ còn ${currentStock} cái). Em đề xuất nhập thêm ${suggestedAmount} cái. Sếp hãy gõ 'Duyệt phiếu nhập ${productTitle} ${suggestedAmount} cái' để em tự lên phiếu và chốt đơn với Nhà cung cấp nhé!`,
+                from: "AI Veltrix-chan (Quản lý kho)"
+            });
+        }
+    } catch (e) {
+        console.error("Lỗi khi check tồn kho ngầm:", e);
+    }
+}
+
 // Logic thực thi Đơn hàng tự động
-async function processOrderLogic(orderCode) {
+async function processOrderLogic(orderCode, io) {
     try {
         const order = await Order.findOne({ code: orderCode });
         if (!order) return { status: "error", message: `Không tìm thấy đơn hàng mã ${orderCode}` };
@@ -39,6 +72,9 @@ async function processOrderLogic(orderCode) {
                 ref_name: orderCode,
                 note: `AI Tự động duyệt đơn và xuất kho cho khách ${order.fullname || "Khách mua hàng"}`
             });
+
+            // Cảnh báo tồn kho thấp
+            checkLowStockAndNotify(prod.productId, prod.title, stock.quantity, io);
         }
 
         // 3. Đổi trạng thái đơn hàng sang vận chuyển
@@ -51,61 +87,119 @@ async function processOrderLogic(orderCode) {
     }
 }
 
-// Logic thực thi duyệt TẤT CẢ đơn hàng pending
-async function processAllOrdersLogic() {
+// Logic thực thi duyệt TẤT CẢ đơn hàng pending (Hỗ trợ chạy ngầm Hybrid)
+async function processAllOrdersLogic(io) {
     try {
         const pendingOrders = await Order.find({ status: "pending" });
         if (pendingOrders.length === 0) return { status: "success", message: "Hiện không có đơn hàng nào đang chờ duyệt." };
 
-        let successCount = 0;
-        let failCount = 0;
-        let failMessages = [];
-        let successCodes = [];
+        const MAX_SYNC_ORDERS = 6;
         
-        for (const order of pendingOrders) {
-            let enoughStock = true;
-            for (const prod of order.products) {
-                const stock = await ProductStock.findOne({ product_id: prod.productId, quantity: { $gte: prod.quantity } });
-                if (!stock) {
-                    enoughStock = false;
-                    failMessages.push(`Đơn ${order.code} thiếu hàng (${prod.title}).`);
-                    break;
+        // Hàm phụ xử lý 1 mảng đơn hàng
+        const processOrdersBatch = async (orders) => {
+            let successCount = 0;
+            let failCount = 0;
+            let failMessages = [];
+            let successCodes = [];
+
+            for (const order of orders) {
+                let enoughStock = true;
+                for (const prod of order.products) {
+                    const stock = await ProductStock.findOne({ product_id: prod.productId, quantity: { $gte: prod.quantity } });
+                    if (!stock) {
+                        enoughStock = false;
+                        failMessages.push(`Đơn ${order.code} thiếu hàng (${prod.title}).`);
+                        break;
+                    }
                 }
+
+                if (!enoughStock) {
+                    failCount++;
+                    continue;
+                }
+
+                for (const prod of order.products) {
+                    const stock = await ProductStock.findOne({ product_id: prod.productId, quantity: { $gte: prod.quantity } });
+                    stock.quantity -= prod.quantity;
+                    await stock.save();
+
+                    await InventoryTransaction.create({
+                        type: "export",
+                        product_id: prod.productId,
+                        warehouse_id: stock.warehouse_id,
+                        quantity: prod.quantity,
+                        ref_id: `EXP-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`,
+                        export_date: new Date(),
+                        ref_name: order.code,
+                        note: `AI Tự động duyệt đơn và xuất kho cho khách ${order.fullname || "Khách mua hàng"}`
+                    });
+
+                    // Cảnh báo tồn kho thấp
+                    checkLowStockAndNotify(prod.productId, prod.title, stock.quantity, io);
+                }
+
+                order.status = "shipped";
+                await order.save();
+                successCount++;
+                successCodes.push(order.code);
             }
+            return { successCount, failCount, failMessages, successCodes };
+        };
 
-            if (!enoughStock) {
-                failCount++;
-                continue;
+        if (pendingOrders.length <= MAX_SYNC_ORDERS) {
+            // Xử lý đồng bộ toàn bộ nếu số lượng nhỏ
+            const result = await processOrdersBatch(pendingOrders);
+            let finalMsg = `Đã duyệt thành công ${result.successCount} đơn hàng${result.successCount > 0 ? ` (Mã: ${result.successCodes.join(", ")})` : ""}. `;
+            if (result.failCount > 0) {
+                finalMsg += `Có ${result.failCount} đơn thất bại do thiếu tồn kho. Chi tiết: ${result.failMessages.join(" ")}`;
             }
+            return { status: "success", message: finalMsg };
+        } else {
+            // NẾU SỐ LƯỢNG LỚN: Cắt 6 đơn đầu xử lý ngay để trả kết quả cho AI
+            const syncOrders = pendingOrders.slice(0, MAX_SYNC_ORDERS);
+            const asyncOrders = pendingOrders.slice(MAX_SYNC_ORDERS);
 
-            for (const prod of order.products) {
-                const stock = await ProductStock.findOne({ product_id: prod.productId, quantity: { $gte: prod.quantity } });
-                stock.quantity -= prod.quantity;
-                await stock.save();
+            const syncResult = await processOrdersBatch(syncOrders);
+            
+            // XỬ LÝ NGẦM PHẦN CÒN LẠI
+            (async () => {
+                try {
+                    const asyncResult = await processOrdersBatch(asyncOrders);
+                    
+                    let finalMsg = `[Background Job] Hệ thống duyệt ngầm hoàn tất! Đã duyệt thành công ${asyncResult.successCount} đơn hàng. `;
+                    if (asyncResult.failCount > 0) {
+                        finalMsg += `Có ${asyncResult.failCount} đơn thất bại do thiếu tồn kho.`;
+                    }
+                    
+                    if (io) {
+                        io.emit("admin_direct_message", {
+                            message: finalMsg,
+                            from: "AI Veltrix-chan (Hệ thống ngầm)"
+                        });
+                        // Có thể emit thêm một event để frontend reload danh sách đơn hàng nếu Sếp đang ở trang orders
+                        // io.emit("admin_orders_updated");
+                    }
+                } catch (err) {
+                    console.error("Lỗi khi xử lý đơn ngầm:", err);
+                    if (io) {
+                        io.emit("admin_direct_message", {
+                            message: `[Background Job] Hệ thống gặp sự cố khi duyệt ngầm: ${err.message}`,
+                            from: "AI Veltrix-chan (Hệ thống ngầm)"
+                        });
+                    }
+                }
+            })(); // Gọi ngay IIFE (Immediately Invoked Function Expression)
 
-                await InventoryTransaction.create({
-                    type: "export",
-                    product_id: prod.productId,
-                    warehouse_id: stock.warehouse_id,
-                    quantity: prod.quantity,
-                    ref_id: `EXP-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`,
-                    export_date: new Date(),
-                    ref_name: order.code,
-                    note: `AI Tự động duyệt đơn và xuất kho cho khách ${order.fullname || "Khách mua hàng"}`
-                });
+            // Lập tức trả về kết quả 6 đơn đầu cho AI
+            let initialMsg = `Đã duyệt nhanh thành công ${syncResult.successCount} đơn hàng đầu tiên. `;
+            if (syncResult.failCount > 0) {
+                initialMsg += `Có ${syncResult.failCount} đơn thất bại do thiếu tồn kho. `;
             }
-
-            order.status = "shipped";
-            await order.save();
-            successCount++;
-            successCodes.push(order.code);
+            initialMsg += `Tuy nhiên, còn tới ${asyncOrders.length} đơn hàng nữa nên hệ thống ĐANG TỰ ĐỘNG CHẠY NGẦM. Sếp cứ đi làm việc khác, vui lòng chờ thông báo Popup (Direct Message) trên góc màn hình khi duyệt xong hoàn toàn nhé!`;
+            
+            return { status: "success", message: initialMsg };
         }
 
-        let finalMsg = `Đã duyệt thành công ${successCount} đơn hàng${successCount > 0 ? ` (Mã: ${successCodes.join(", ")})` : ""}. `;
-        if (failCount > 0) {
-            finalMsg += `Có ${failCount} đơn thất bại do thiếu tồn kho. Chi tiết: ${failMessages.join(" ")}`;
-        }
-        return { status: "success", message: finalMsg };
     } catch (e) {
         return { status: "error", message: `Lỗi hệ thống: ${e.message}` };
     }
@@ -250,8 +344,150 @@ Chỉ trả về nội dung câu trả lời, không có định dạng markdown
     }
 }
 
+// Logic Auto-Marketing: Dọn kho hàng ế
+async function autoMarketingLogic(io) {
+    try {
+        const systemConfig = await System.findOne({});
+        if (!systemConfig || !systemConfig.ai || !systemConfig.ai.apiKey) {
+            return { status: "error", message: "Chưa cấu hình API Key của AI" };
+        }
+
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        // Tìm các sản phẩm đang active
+        const allProducts = await Product.find({ deleted: false, status: "active" });
+        if (!allProducts || allProducts.length === 0) {
+            return { status: "error", message: "Hệ thống chưa có sản phẩm nào để marketing." };
+        }
+
+        // Tìm các product_id đã được xuất kho trong 30 ngày qua
+        const recentExports = await InventoryTransaction.find({ 
+            type: "export", 
+            createdAt: { $gte: thirtyDaysAgo } 
+        }).distinct("product_id");
+
+        // Lọc ra sản phẩm ế (Không có giao dịch xuất kho nào gần đây)
+        const deadProducts = allProducts.filter(p => !recentExports.some(id => id.toString() === p._id.toString()));
+        
+        if (deadProducts.length === 0) {
+            return { status: "success", message: "Tuyệt vời! Hệ thống không có sản phẩm nào bị ế trong 30 ngày qua." };
+        }
+
+        // Chọn ngẫu nhiên 1 sản phẩm ế để làm marketing
+        const targetProduct = deadProducts[Math.floor(Math.random() * deadProducts.length)];
+
+        // Gọi AI viết bài SEO
+        const aiModel = systemConfig.ai?.model || "gemini-1.5-flash";
+        const genAI = new GoogleGenerativeAI(systemConfig.ai.apiKey);
+        const model = genAI.getGenerativeModel({ model: aiModel });
+        
+        const prompt = `Viết một bài PR sản phẩm dài khoảng 300 từ chuẩn SEO cực kỳ hấp dẫn về sản phẩm sau để kích cầu mua sắm.
+Tên sản phẩm: ${targetProduct.title}
+Mô tả ngắn: ${targetProduct.description || "Một sản phẩm tuyệt vời từ Veltrix Gear."}
+Giá: ${targetProduct.price.toLocaleString()} VNĐ
+
+Yêu cầu:
+- Viết dưới dạng 1 bài viết HTML chuẩn SEO (chỉ dùng các thẻ h2, p, strong, ul, li).
+- KHÔNG CẦN thẻ <html>, <head>, hay <body>, CHỈ TRẢ VỀ NỘI DUNG HTML bên trong.
+- Giọng văn: Lôi cuốn, thú vị, thuyết phục khách hàng chốt đơn ngay.
+- Kết thúc bằng một lời kêu gọi hành động (Call To Action) nhắc họ sử dụng mã giảm giá 10% độc quyền.`;
+
+        const result = await model.generateContent(prompt);
+        let htmlContent = result.response.text().trim();
+        if(htmlContent.startsWith("\`\`\`html")) {
+            htmlContent = htmlContent.replace(/\`\`\`html/g, "").replace(/\`\`\`/g, "").trim();
+        }
+
+        // Đăng bài viết lên mục News
+        const News = require("../Models/news.model");
+        const slugify = require("slugify");
+        const articleSlug = slugify(targetProduct.title + "-giam-gia-soc-" + Date.now(), { lower: true });
+        
+        const newArticle = await News.create({
+            title: `[Siêu Deal] Tại sao bạn nên sở hữu ngay ${targetProduct.title} trong tháng này?`,
+            slug: articleSlug,
+            content: htmlContent,
+            description: `Khám phá ngay lý do ${targetProduct.title} đang là sản phẩm đáng mua nhất với ưu đãi độc quyền 10%.`,
+            thumbnail: targetProduct.thumbnail,
+            status: "published",
+            createdBy: { fullname: "Veltrix AI (Auto-Marketing)" }
+        });
+
+        // Tạo Voucher giảm giá 10%
+        const Voucher = require("../Models/vouchers.model");
+        const voucherCode = `DONKHO-${targetProduct.slug.toUpperCase().slice(0, 5)}-${Math.floor(Math.random() * 1000)}`;
+        
+        await Voucher.create({
+            code: voucherCode,
+            description: `Giảm 10% cho ${targetProduct.title} - AI Auto-Marketing`,
+            discountType: "percentage",
+            discountValue: 10,
+            maxDiscount: 500000,
+            minOrderValue: 0,
+            quantity: 100,
+            isActive: true
+        });
+
+        // Bắn Email hàng loạt chạy ngầm
+        (async () => {
+            try {
+                const users = await User.find({ deleted: false, status: "active" });
+                const subject = `🔥 Ưu đãi độc quyền 10% cho ${targetProduct.title} - Chỉ dành riêng cho bạn!`;
+                // URL mẫu cho Frontend
+                const articleUrl = `https://floren-x-v2-frontend.vercel.app/news/detail/${articleSlug}`;
+                const productUrl = `https://floren-x-v2-frontend.vercel.app/products/detail/${targetProduct.slug}`;
+                
+                let sentCount = 0;
+                for (const user of users) {
+                    if (user.email) {
+                        const emailHtml = `
+                            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+                                <h2 style="color: #0ea5e9; text-align: center;">Veltrix Gear Dọn Kho Giá Sốc</h2>
+                                <p>Chào <strong>${user.fullname || "bạn"}</strong>,</p>
+                                <p>Veltrix Gear dành tặng bạn mã giảm giá <strong>10%</strong> (Tối đa 500k) khi mua siêu phẩm <strong>${targetProduct.title}</strong>.</p>
+                                <div style="background: #f8fafc; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                                    <p style="margin: 0; font-size: 14px; color: #64748b;">Mã ưu đãi của bạn:</p>
+                                    <p style="margin: 10px 0 0 0; font-size: 24px; color: #e11d48; font-weight: bold; letter-spacing: 2px;">${voucherCode}</p>
+                                </div>
+                                <div style="text-align: center; margin-top: 30px;">
+                                    <a href="${productUrl}" style="background: #0ea5e9; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">ĐẶT HÀNG NGAY</a>
+                                </div>
+                                <p style="margin-top: 30px;">Hoặc đọc bài đánh giá chi tiết của Veltrix về sản phẩm này tại đây: <a href="${articleUrl}" style="color: #0ea5e9;">Xem bài viết</a></p>
+                                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+                                <p style="font-size: 12px; color: #94a3b8; text-align: center;">Email này được tự động gửi bởi Hệ thống AI Veltrix-chan.</p>
+                            </div>
+                        `;
+                        // Fire and forget
+                        sendMail(user.email, subject, emailHtml).catch(e => console.error(e));
+                        sentCount++;
+                    }
+                }
+
+                if (io) {
+                    io.emit("admin_direct_message", {
+                        message: `🎯 [MARKETING THÀNH CÔNG] Chiến dịch dọn kho cho '${targetProduct.title}' đã chạy xong. Đã tạo bài SEO, tạo mã '${voucherCode}' và gửi email đến ${sentCount} khách hàng!`,
+                        from: "AI Veltrix-chan (Marketing)"
+                    });
+                }
+            } catch (err) {
+                console.error("Auto-Marketing Error:", err);
+            }
+        })();
+
+        return { 
+            status: "success", 
+            message: `Em đã chọn sản phẩm '${targetProduct.title}' để dọn kho. Bài Blog chuẩn SEO và mã Voucher '${voucherCode}' đã được khởi tạo. Hệ thống đang tiến hành rải Email ngầm cho khách hàng cũ, Sếp chờ xem thông báo nhé!` 
+        };
+
+    } catch (e) {
+        return { status: "error", message: `Auto-Marketing Error: ${e.message}` };
+    }
+}
+
 module.exports = {
     processOrderLogic,
     processAllOrdersLogic,
-    processReviewLogic
+    processReviewLogic,
+    autoMarketingLogic
 };

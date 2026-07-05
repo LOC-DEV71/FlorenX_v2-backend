@@ -12,14 +12,7 @@ router.get("/detail", middleware.permissionMiddleWare("setting_management"), con
 router.patch(
   "/update",
   middleware.permissionMiddleWare("setting_management"),
-  upload.fields([
-    { name: "logo", maxCount: 1 },
-    { name: "favicon", maxCount: 1 },
-    { name: "bannerDesktop", maxCount: 1 },
-    { name: "bannerMobile", maxCount: 1 },
-    { name: "sectionHeroImages", maxCount: 20 },
-    { name: "sectionHeroSliderImages", maxCount: 50 }
-  ]),
+  upload.any(),
   cloudinary.streamUploadSetting,
   controller.update
 );

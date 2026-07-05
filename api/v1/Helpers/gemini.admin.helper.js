@@ -1,6 +1,8 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const System = require("../Models/system.model");
 
+// ĐÍCH ĐẾN CUỐI CÙNG: Hàm tạo BỘ NÃO (System Prompt) cho AI
+// Nhận toàn bộ nguyên liệu từ Controller để nhào nặn thành 1 kịch bản hoàn chỉnh
 const generateAdminPrompt = (userMessage, dashboardContext, chatHistory, permissionsContext = "", systemPermissionsContext = "", uploadedImages = [], documentContext = "") => {
     let imageContext = "";
     if (uploadedImages && uploadedImages.length > 0) {
@@ -37,6 +39,7 @@ NHIỆM VỤ & SỬ DỤNG TOOLS (CỰC KỲ QUAN TRỌNG):
 - TẠO BÀI VIẾT TỰ ĐỘNG: Khi Sếp yêu cầu viết bài, BẮT BUỘC sử dụng công cụ \`createArticle\`. TỰ ĐỘNG phát triển ý tưởng từ vài từ khóa của Sếp thành một bài viết chuyên sâu, sắc sảo (dài trên 1000 chữ), văn phong cuốn hút như một chuyên gia công nghệ, và kết bài nhớ lồng ghép khéo léo lời kêu gọi mua hàng tại Veltrix Gear.
 - QUẢN LÝ ĐƠN HÀNG THÔNG MINH: Khi Sếp yêu cầu "duyệt đơn" hoặc "duyệt hết", BẮT BUỘC sử dụng công cụ \`processOrder\`. NẾU có đơn hàng bị thiếu tồn kho hoặc lỗi, phải báo cáo lại NGAY LẬP TỨC và đề xuất nhập thêm hàng. Nếu duyệt thành công, hãy báo cáo tóm tắt rành mạch.
 - BẬT/TẮT AUTO-PILOT: BẮT BUỘC dùng công cụ \`toggleAutoProcessOrders\`. Nếu Sếp hỏi tại sao nút Avatar AI có hiệu ứng vòng sáng, hãy giải thích đó là "Auto-Pilot (Duyệt đơn tự động)" đang BẬT và miệt mài làm việc ngầm.
+- BẬT/TẮT GIÁM SÁT TOÀN HỆ THỐNG (GOD MODE): Khi Sếp yêu cầu "bật giám sát", "tắt giám sát" hoặc "bật/tắt God Mode", BẮT BUỘC dùng công cụ \`toggleAutoSystemMonitor\`.
 - PHẢN HỒI ĐÁNH GIÁ TỰ ĐỘNG: Khi Sếp yêu cầu kiểm tra hoặc trả lời đánh giá (reviews), BẮT BUỘC dùng công cụ \`replyProductReviews\`. Nếu Sếp chỉ hỏi "có đánh giá nào chưa trả lời không", truyền searchAll=true. Nếu Sếp nói "trả lời hết đi", truyền replyAll=true. Nếu Sếp chỉ định sản phẩm cụ thể, truyền keyword.
 - CÔNG CỤ TOÀN NĂNG (DATABASE EXECUTION): BẤT CỨ KHI NÀO Sếp ra một lệnh quản trị (tìm kiếm, đếm, cập nhật, xóa) nằm ngoài các công cụ cụ thể trên, BẮT BUỘC sử dụng công cụ \`executeDatabaseQuery\`. 
   + AI phải tự suy luận ra modelName (Product, Category, Order, User...) và viết \`queryJson\`, \`updateJson\` hợp lý.
@@ -226,7 +229,8 @@ const createArticleTool = {
             slug_category: { type: "STRING", description: "Danh mục của bài viết. BẮT BUỘC chọn 1 trong các giá trị sau: 'code-game', 'tin-tuc-cong-nghe', 'khuyen-mai', 'lien-quan'" },
             description: { type: "STRING", description: "Mô tả ngắn gọn về bài viết (khoảng 2-3 câu)" },
             content: { type: "STRING", description: "Nội dung bài viết RẤT CHI TIẾT VÀ DÀI (Ít nhất 1000 chữ). Phân tích sâu, văn phong lôi cuốn. Định dạng HTML cho TinyMCE. NẾU CÓ ẢNH TỪ findProduct: Chèn ảnh thật vào giữa bài. NẾU KHÔNG CÓ ẢNH THẬT: Tìm ảnh minh họa bằng thẻ <img src='https://loremflickr.com/800/400/{keywords}/all' style='width:100%;border-radius:8px;margin:16px 0' /> (Trong đó {keywords} là 1-3 từ khóa TIẾNG ANH cốt lõi mô tả chủ đề, cách nhau bằng dấu phẩy, tuyệt đối KHÔNG dùng tiếng Việt. Ví dụ: elon,musk,space)." },
-            thumbnail_url: { type: "STRING", description: "Link ảnh đại diện. NẾU CÓ ẢNH TỪ findProduct: Dùng ảnh đó. NẾU KHÔNG CÓ: Dùng link 'https://loremflickr.com/800/400/{keywords}/all' với {keywords} tiếng Anh như trên." }
+            thumbnail_url: { type: "STRING", description: "Link ảnh đại diện. NẾU CÓ ẢNH TỪ findProduct: Dùng ảnh đó. NẾU KHÔNG CÓ: Dùng link 'https://loremflickr.com/800/400/{keywords}/all' với {keywords} tiếng Anh như trên." },
+            product_keyword: { type: "STRING", description: "NẾU bài viết này nói về một sản phẩm cụ thể, HÃY TRUYỀN VÀO tên sản phẩm đó để hệ thống tự động chèn ảnh thật (thumbnail và images) từ database vào bài viết." }
         },
         required: ["title", "slug_category", "description", "content"]
     }
@@ -308,6 +312,29 @@ const reportUnauthorizedActionTool = {
     }
 };
 
+const approveRestockTool = {
+    name: "approveRestock",
+    description: "Công cụ này tự động lên Phiếu Nhập Kho (Import Request) để chốt đơn với nhà cung cấp khi Sếp gõ lệnh DUYỆT phiếu nhập. Sử dụng công cụ này khi Sếp muốn bổ sung hàng hóa sắp hết.",
+    parameters: {
+        type: "OBJECT",
+        properties: {
+            keyword: { type: "STRING", description: "Tên hoặc slug của sản phẩm cần nhập kho" },
+            quantity: { type: "NUMBER", description: "Số lượng Sếp muốn nhập (mặc định lấy theo đề xuất nếu Sếp không ghi rõ)" }
+        },
+        required: ["keyword", "quantity"]
+    }
+};
+
+const triggerAutoMarketingTool = {
+    name: "triggerAutoMarketing",
+    description: "Sử dụng công cụ này khi Sếp yêu cầu dọn kho, xả hàng ế hoặc chạy chiến dịch Marketing. Hệ thống sẽ tự động tìm 1 sản phẩm ế, dùng AI viết bài SEO Blog, tạo mã Voucher 10% và gửi Email rải thảm cho khách hàng.",
+    parameters: {
+        type: "OBJECT",
+        properties: {}
+    }
+};
+
+// TRẠM TRUNG CHUYỂN: Hàm này nhận dữ liệu từ Controller, gọi Hàm tạo BỘ NÃO, và gửi lên Google
 module.exports.askGeminiAdmin = async (userMessage, dashboardContext = "", chatHistory = "", permissionsContext = "", systemPermissionsContext = "", processOrderCallback = null, uploadedImages = [], documentContext = "") => {
     try {
         let systemConfig = await System.findOne({});
@@ -324,28 +351,35 @@ module.exports.askGeminiAdmin = async (userMessage, dashboardContext = "", chatH
         }
 
         const aiModel = systemConfig.ai?.model || "gemini-1.5-flash";
+        
+        // BƯỚC 1: Khởi tạo kết nối với Google thông qua API Key
         const genAI = new GoogleGenerativeAI(systemConfig.ai.apiKey);
 
         console.log("Bạn đang dùng Model AI: ", aiModel)
 
 
+        // BƯỚC 2: Cấp tay chân (Tools) cho con AI để nó có thể tự động chạy hàm
         const model = genAI.getGenerativeModel({
             model: aiModel,
             generationConfig: { temperature: 0.8 },
             tools: [
-                { functionDeclarations: [processOrderTool, toggleAutoProcessOrdersTool, toggleAutoSystemMonitorTool, checkAdminActivityTool, getDashboardStatsTool, generatePDFTool, getOrderDetailsTool, getExportReceiptDetailsTool, findProductTool, createArticleTool, replyProductReviewsTool, executeDatabaseQueryTool, navigateFrontendTool, sendDirectMessageTool, getOnlineAdminsTool, reportUnauthorizedActionTool] }
+                { functionDeclarations: [processOrderTool, toggleAutoProcessOrdersTool, toggleAutoSystemMonitorTool, checkAdminActivityTool, getDashboardStatsTool, generatePDFTool, getOrderDetailsTool, getExportReceiptDetailsTool, findProductTool, createArticleTool, replyProductReviewsTool, executeDatabaseQueryTool, navigateFrontendTool, sendDirectMessageTool, getOnlineAdminsTool, reportUnauthorizedActionTool, approveRestockTool, triggerAutoMarketingTool] }
             ]
         });
 
+        // BƯỚC 3: Chạy hàm generateAdminPrompt để nhét dữ liệu vào "Bộ não"
         const finalPrompt = generateAdminPrompt(userMessage, dashboardContext, chatHistory, permissionsContext, systemPermissionsContext, uploadedImages, documentContext);
 
         // Khởi tạo Chat Session để hỗ trợ Function Calling multi-turn
         const chat = model.startChat();
 
+        // BƯỚC 4: Gửi toàn bộ dữ liệu lên Google và chờ kết quả
         let result = await chat.sendMessage(finalPrompt);
         let response = await result.response;
 
-        // Kiểm tra xem AI có yêu cầu gọi hàm không (Hỗ trợ gọi liên tiếp nhiều hàm)
+        // BƯỚC 5: KIỂM TRA AI CÓ GỌI HÀM (FUNCTION CALL) KHÔNG?
+        // Nếu AI quyết định dùng Tools (Ví dụ: findProduct), nó sẽ trả về functionCalls thay vì text.
+        // Hỗ trợ gọi liên tiếp tối đa 5 hàm trong 1 lần chat.
         let maxToolCalls = 5;
         let extraData = {};
         while (response.functionCalls() && response.functionCalls().length > 0 && maxToolCalls > 0) {

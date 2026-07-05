@@ -103,52 +103,6 @@ const settingSchema = new mongoose.Schema(
         default: null
       }
     },
-
-    section_hero: [
-      {
-        image: {
-          type: String,
-          default: ""
-        },
-        title: {
-          type: String,
-          default: ""
-        },
-        desc: {
-          type: String,
-          default: ""
-        },
-        tag: {
-          type: String,
-          default: ""
-        },
-        link: {
-          type: String,
-          default: ""
-        }
-      }
-    ],
-
-    section_hero_slider: [
-      {
-        image: {
-          type: String,
-          default: ""
-        },
-        title: {
-          type: String,
-          default: ""
-        },
-        tag: {
-          type: String,
-          default: ""
-        },
-        link: {
-          type: String,
-          default: ""
-        }
-      }
-    ]
   },
   {
     timestamps: true
