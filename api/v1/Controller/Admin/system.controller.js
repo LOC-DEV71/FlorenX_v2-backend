@@ -23,6 +23,9 @@ module.exports.getSystemConfig = async (req, res) => {
     if (systemData.email && systemData.email.smtpPassword) {
       systemData.email.smtpPassword = '************************';
     }
+    if (systemData.email && systemData.email.resendApiKey) {
+      systemData.email.resendApiKey = '************************';
+    }
     if (systemData.iam && systemData.iam.googleClientId) {
       systemData.iam.googleClientId = '************************';
     }
@@ -84,6 +87,9 @@ module.exports.updateSystemConfig = async (req, res) => {
     if (updateData.email) {
       if (updateData.email.smtpPassword === '************************') {
         updateData.email.smtpPassword = system.email.smtpPassword; // Keep original
+      }
+      if (updateData.email.resendApiKey === '************************') {
+        updateData.email.resendApiKey = system.email.resendApiKey; // Keep original
       }
       system.email = { ...system.toObject().email, ...updateData.email };
     }
@@ -239,6 +245,7 @@ module.exports.verifySecretOtp = async (req, res) => {
     let secretValue = "";
     if (field === "apiKey") secretValue = system?.ai?.apiKey || "";
     if (field === "smtpPassword") secretValue = system?.email?.smtpPassword || "";
+    if (field === "resendApiKey") secretValue = system?.email?.resendApiKey || "";
     if (field === "googleClientId") secretValue = system?.iam?.googleClientId || "";
     if (field === "jwtSecret") secretValue = system?.iam?.jwtSecret || "";
     if (field === "cloudinaryApiKey") secretValue = system?.media?.cloudinaryApiKey || "";

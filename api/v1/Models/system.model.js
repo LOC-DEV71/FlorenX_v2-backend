@@ -41,8 +41,10 @@ const systemSchema = new mongoose.Schema(
     
     // Cấu hình Email SMTP
     email: {
+      provider: { type: String, enum: ['google', 'resend'], default: 'google' },
       smtpEmail: { type: String, default: '' },
       smtpPassword: { type: String, default: '' },
+      resendApiKey: { type: String, default: '' },
       senderName: { type: String, default: 'FlorenX System' }
     },
     
