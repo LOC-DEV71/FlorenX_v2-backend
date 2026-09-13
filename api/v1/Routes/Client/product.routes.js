@@ -7,5 +7,6 @@ router.get("/cross-sell", controller.getCrossSellProducts);
 router.get("/:category", controller.getProductByCategory);
 router.get("/detail/:slug", controller.getProductBySlug);
 router.get("/sale/:category", controller.getProductBySale);
+router.get("/search", controller.searchProducts);
 
 module.exports = router;

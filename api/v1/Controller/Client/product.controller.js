@@ -341,4 +341,85 @@ module.exports.getCrossSellProducts = async (req, res) => {
     }
 }
 
+module.exports.searchProducts = async (req, res) => {
+    try {
+        const keyword = req.query.keyword || "";
+        
+        const find = {
+            deleted: false,
+            status: "active"
+        };
 
+        if (keyword) {
+            find.title = { $regex: keyword, $options: "i" };
+        }
+
+        switch (req.query.price) {
+            case "5000000":
+                find.price = { $lt: 5000000 };
+                break;
+            case "50000000":
+                find.price = { $lt: 50000000 };
+                break;
+            case "500000000":
+                find.price = { $lt: 500000000 };
+                break;
+            case "15000000":
+                find.price = { $lt: 15000000 };
+                break;
+            default:
+                break;
+        }
+
+        if (req.query.discount === "true") {
+            find.discountPercentage = { $gt: 0, $type: "number" };
+        }
+
+        const countProducts = await Product.find(find).countDocuments();
+        const pagination = paginationHelper.pagination(countProducts, req.query);
+
+        const products = await Product.aggregate([
+            { $match: find },
+            { $sort: { position: -1 } },
+            { $skip: pagination.skip },
+            { $limit: pagination.limit },
+            {
+                $lookup: {
+                    from: "product_reviews",
+                    localField: "_id",
+                    foreignField: "product_id",
+                    as: "reviews",
+                    pipeline: [
+                        { $project: { rating: 1, _id: 0 } }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    totalReviews: { $size: "$reviews" },
+                    averageRating: {
+                        $cond: {
+                            if: { $gt: [{ $size: "$reviews" }, 0] },
+                            then: { $avg: "$reviews.rating" },
+                            else: 0
+                        }
+                    }
+                }
+            },
+            {
+                $unset: "reviews"
+            }
+        ]);
+
+        return res.status(200).json({
+            code: true,
+            products,
+            pagination
+        });
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error.message}`,
+            code: false
+        });
+    }
+};
