@@ -13,8 +13,9 @@ module.exports.sendMail = async (email, subject, html) => {
 
         const transporter = nodemailer.createTransport({
             host: 'smtp.gmail.com',
-            port: 465,
-            secure: true,
+            port: 587,
+            secure: false, // dùng false cho port 587 (bắt buộc dùng TLS/STARTTLS)
+            requireTLS: true,
             auth: {
                 user: emailConfig.smtpEmail,
                 pass: emailConfig.smtpPassword.replace(/\s+/g, '') // Tự động xóa khoảng trắng nếu người dùng nhập dư
