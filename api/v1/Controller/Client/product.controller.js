@@ -351,7 +351,12 @@ module.exports.searchProducts = async (req, res) => {
         };
 
         if (keyword) {
-            find.title = { $regex: keyword, $options: "i" };
+            const regex = new RegExp(keyword, "i");
+            find.$or = [
+                { title: regex },
+                { slug: regex },
+                { brand: regex }
+            ];
         }
 
         switch (req.query.price) {
