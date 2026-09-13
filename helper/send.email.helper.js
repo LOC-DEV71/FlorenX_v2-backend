@@ -19,8 +19,13 @@ module.exports.sendMail = async (email, subject, html) => {
                 return false;
             }
             
-            if(!emailConfig.smtpEmail) {
+            let resendSenderEmail = emailConfig.smtpEmail;
+            // Resend không cho phép gửi bằng @gmail.com, @yahoo.com...
+            // Nếu người dùng nhập gmail hoặc bỏ trống, ép dùng onboarding@resend.dev để test
+            if(!resendSenderEmail || resendSenderEmail.includes('@gmail.com') || resendSenderEmail.includes('@yahoo.com')) {
                 fromAddress = `"${emailConfig.senderName || 'FlorenX System'}" <onboarding@resend.dev>`;
+            } else {
+                fromAddress = `"${emailConfig.senderName || 'FlorenX System'}" <${resendSenderEmail}>`;
             }
 
             try {
