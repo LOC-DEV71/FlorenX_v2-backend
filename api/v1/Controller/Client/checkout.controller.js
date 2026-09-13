@@ -107,12 +107,16 @@ module.exports.order = async (req, res) => {
       }
     }
 
-    const user = await Users.findOne({ email: email });
-    if (!user) {
-      return res.status(404).json({
-        code: false,
-        message: `Người dùng không tồn tại`,
-      });
+    let user = null;
+    if (req.cookies.token_client) {
+      try {
+        const decoded = await jwtHelper.verifyToken(req.cookies.token_client);
+        if (decoded && decoded.id) {
+          user = await Users.findOne({ _id: decoded.id });
+        }
+      } catch (err) {
+        // Token lỗi hoặc chưa đăng nhập, coi như khách mua vãng lai (guest)
+      }
     }
 
 
@@ -229,10 +233,12 @@ module.exports.order = async (req, res) => {
     formSendMail.sendOrderConfirmation(email, orderData);
 
 
-    await Carts.updateOne(
-      { user_id: user._id.toString() },
-      { $set: { products: [] } }
-    )
+    if (user) {
+      await Carts.updateOne(
+        { user_id: user._id.toString() },
+        { $set: { products: [] } }
+      )
+    }
 
     // Luôn bắn Socket thông báo có đơn hàng mới cho Admin (để đổ chuông báo động)
     const io = req.app.get("io");

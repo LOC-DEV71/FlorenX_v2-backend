@@ -12,10 +12,12 @@ module.exports.sendMail = async (email, subject, html) => {
         }
 
         const transporter = nodemailer.createTransport({
-            service: 'gmail',
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
             auth: {
                 user: emailConfig.smtpEmail,
-                pass: emailConfig.smtpPassword
+                pass: emailConfig.smtpPassword.replace(/\s+/g, '') // Tự động xóa khoảng trắng nếu người dùng nhập dư
             }
         });
 
