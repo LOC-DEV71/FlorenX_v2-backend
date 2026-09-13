@@ -250,8 +250,8 @@ module.exports.getMe = async (req, res) => {
 
 module.exports.logout = async (req, res) => {
   try {
-    res.clearCookie("token_client");
-    res.clearCookie("cart");
+    res.clearCookie("token_client", { httpOnly: true, secure: true, sameSite: "none" });
+    res.clearCookie("cart", { httpOnly: true, secure: true, sameSite: "none" });
     return res.status(200).json({ message: `ok`, code: true });
   } catch (err) {
     return res.status(400).json({ message: `Lỗi: ${err}` });
