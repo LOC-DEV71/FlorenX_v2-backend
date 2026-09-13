@@ -25,6 +25,38 @@ module.exports.getList = async (req, res) => {
     }
 }
 
+module.exports.getTotalSpent = async (req, res) => {
+    try {
+        const token_client = req.cookies.token_client;
+        if (!token_client) {
+            return res.status(401).json({ code: false, message: "Không tìm thấy token" });
+        }
+        const decode = await jwtHelper.verifyToken(token_client);
+        const user = await Users.findOne({ _id: decode.id }).select("email");
+        if (!user) {
+            return res.status(404).json({ code: false, message: "User not found" });
+        }
+
+        const validStatuses = ["pending", "confirmed", "shipped", "done"];
+        const result = await Orders.aggregate([
+            { $match: { email: user.email, status: { $in: validStatuses } } },
+            { $group: { _id: null, total: { $sum: "$finalPrice" } } }
+        ]);
+
+        const totalSpent = result.length > 0 ? result[0].total : 0;
+
+        return res.status(200).json({
+            code: true,
+            totalSpent
+        });
+    } catch (error) {
+        return res.status(400).json({
+            message: `Lỗi: ${error}`,
+            code: false
+        });
+    }
+}
+
 module.exports.cancelOrder = async (req, res) => {
     try {
         console.log("=== API cancelOrder hit ===", req.params);
