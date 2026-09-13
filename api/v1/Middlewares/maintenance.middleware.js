@@ -7,7 +7,7 @@ module.exports.checkMaintenance = async (req, res, next) => {
             return next();
         }
 
-        const { blockAuth, blockCart, blockCheckout, blockOrders, blockReviews, blockAi } = system.maintenance;
+        const { blockAuth, blockCart, blockCheckout, blockOrders, blockReviews, blockAi, blockSendMail } = system.maintenance;
         const originalUrl = req.originalUrl; // VD: /api/v1/client/auth/login
 
         const blockConfig = [
@@ -16,7 +16,9 @@ module.exports.checkMaintenance = async (req, res, next) => {
             { isBlocked: blockCheckout, routeMatch: "/client/checkout", message: "Hệ thống đang ở chế độ Chỉ Xem (View-only). Tính năng Đặt hàng và Thanh toán tạm thời bị khóa." },
             { isBlocked: blockOrders, routeMatch: "/client/orders", message: "Hệ thống đang ở chế độ Chỉ Xem (View-only). Quản lý Đơn hàng tạm thời bị khóa." },
             { isBlocked: blockReviews, routeMatch: "/client/product-preview", message: "Hệ thống đang ở chế độ Chỉ Xem (View-only). Tính năng Đánh giá sản phẩm tạm thời bị khóa." },
-            { isBlocked: blockAi, routeMatch: "/client/ai", message: "Hệ thống đang ở chế độ Chỉ Xem (View-only). Trợ lý ảo Veltrix-chan tạm thời nghỉ ngơi." }
+            { isBlocked: blockAi, routeMatch: "/client/ai", message: "Hệ thống đang ở chế độ Chỉ Xem (View-only). Trợ lý ảo Veltrix-chan tạm thời nghỉ ngơi." },
+            { isBlocked: blockSendMail, routeMatch: "/client/auth/forgot-password", message: "Hệ thống đang ở chế độ Chỉ Xem. Tính năng Gửi mã OTP khôi phục mật khẩu tạm thời bị khóa để chống Spam." },
+            { isBlocked: blockSendMail, routeMatch: "/client/auth/create", message: "Hệ thống đang ở chế độ Chỉ Xem. Tính năng Đăng ký tài khoản mới tạm thời bị khóa để chống Spam." }
         ];
 
         for (const config of blockConfig) {

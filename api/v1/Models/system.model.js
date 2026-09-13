@@ -89,7 +89,8 @@ const systemSchema = new mongoose.Schema(
       blockCheckout: { type: Boolean, default: false },
       blockOrders: { type: Boolean, default: false },
       blockReviews: { type: Boolean, default: false },
-      blockAi: { type: Boolean, default: false }
+      blockAi: { type: Boolean, default: false },
+      blockSendMail: { type: Boolean, default: false }
     }
   },
   {
