@@ -80,6 +80,16 @@ const systemSchema = new mongoose.Schema(
       vatPercent: { type: Number, default: 8 },
       pointEarnRatio: { type: Number, default: 10000 }, // 10k VND = 1 Điểm
       pointRedeemRatio: { type: Number, default: 100 }  // 1 Điểm = 100 VND
+    },
+
+    // Cấu hình Bảo trì (Maintenance / Route Blocking)
+    maintenance: {
+      blockAuth: { type: Boolean, default: false },
+      blockCart: { type: Boolean, default: false },
+      blockCheckout: { type: Boolean, default: false },
+      blockOrders: { type: Boolean, default: false },
+      blockReviews: { type: Boolean, default: false },
+      blockAi: { type: Boolean, default: false }
     }
   },
   {

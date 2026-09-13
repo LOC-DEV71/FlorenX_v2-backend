@@ -136,6 +136,10 @@ module.exports.updateSystemConfig = async (req, res) => {
     if (updateData.aiModels) {
       system.aiModels = updateData.aiModels;
     }
+    
+    if (updateData.maintenance) {
+      system.maintenance = { ...system.toObject().maintenance, ...updateData.maintenance };
+    }
 
     await system.save();
 
