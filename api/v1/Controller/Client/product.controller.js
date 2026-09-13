@@ -12,7 +12,7 @@ const mongoose = require("mongoose");
 // const jwtUtils = require("../../../../utils/jwt.utils")
 module.exports.getProductByCategory = async (req, res) => {
     try {
-        const { category } = req.params;   
+        const { category } = req.params;
 
         const productCategory = await Category.findOne({
             slug: category,
@@ -28,8 +28,8 @@ module.exports.getProductByCategory = async (req, res) => {
         }
 
 
-        const product_category_id = productCategory._id;
-        const childIds = await getChildrenCategories.getChildrenCategories(product_category_id);
+        const product_category_id = productCategory._id.toString();
+        const childIds = await getChildrenCategories.getChildrenCategories(product_category_id)
         const categortIds = [product_category_id, ...childIds];
 
         const find = {
@@ -64,7 +64,7 @@ module.exports.getProductByCategory = async (req, res) => {
         const pagination = paginationHelper.pagination(countProducts, req.query);
 
 
-       const products = await Product.aggregate([
+        const products = await Product.aggregate([
             { $match: find },
             { $sort: { position: -1 } },
             { $skip: pagination.skip },
@@ -124,7 +124,7 @@ module.exports.getProductBySlug = async (req, res) => {
         const category = await Category.findOne({
             _id: product.product_category_id
         })
-        
+
         const products = await Product.aggregate([
             {
                 $match: {
@@ -176,20 +176,20 @@ module.exports.getProductBySlug = async (req, res) => {
 module.exports.getProductBySale = async (req, res) => {
     try {
         const slug = req.params.category;
-        const parentId = await Category.findOne({slug: slug});
+        const parentId = await Category.findOne({ slug: slug });
         const childIds = await getChildrenCategories.getChildrenCategories(parentId)
-       
-        const childListId = [parentId._id,...childIds];
+
+        const childListId = [parentId._id, ...childIds];
 
         const find = {
             deleted: false,
             product_category_id: { $in: childListId },
             status: "active",
-            discountPercentage: { $gt: 0 } 
+            discountPercentage: { $gt: 0 }
         }
 
         const products = await Product.aggregate([
-            {$match: find},
+            { $match: find },
             { $sort: { position: -1 } },
             { $limit: 4 },
             {
@@ -201,7 +201,7 @@ module.exports.getProductBySale = async (req, res) => {
                     pipeline: [
                         { $project: { rating: 1, _id: 0 } }
                     ]
-                } 
+                }
             },
             {
                 $addFields: {
@@ -220,7 +220,7 @@ module.exports.getProductBySale = async (req, res) => {
                 $unset: "reviews"
             }
         ])
-            
+
         return res.status(200).json({
             code: true,
             products
@@ -245,7 +245,7 @@ module.exports.getCrossSellProducts = async (req, res) => {
             return res.status(400).json({ code: false, message: "Token giỏ hàng không hợp lệ" });
         }
 
-        const cart = await Cart.findOne({_id: decode.id});
+        const cart = await Cart.findOne({ _id: decode.id });
         if (!cart) {
             return res.status(400).json({ code: false, message: "Giỏ hàng không tồn tại" });
         }
@@ -260,7 +260,7 @@ module.exports.getCrossSellProducts = async (req, res) => {
             status: "active"
         }).select("product_category_id")
 
-        
+
         const product_category_select_ids = [...new Set(product_category.map((item) => item.product_category_id.toString()))];
 
         // LẤY RA DANH MỤC CHA CỦA CÁC SẢN PHẨM TRONG GIỎ HÀNG
@@ -273,11 +273,11 @@ module.exports.getCrossSellProducts = async (req, res) => {
             parent_id: null
         }).select("_id")
         const categoryIdsString = categoryIds.map(item => item._id.toString());
-        
+
         // BÂY GIỜ LỌC: Các danh mục tổng trừ đi danh mục cha của các sản phẩm trong giỏ
         const categoryFilter = categoryIdsString.filter(item => !cartParentCategoryIds.includes(item));
         const shuffled = categoryFilter.sort(() => 0.5 - Math.random());
-        const randomCategory = shuffled.slice(0, 4);    
+        const randomCategory = shuffled.slice(0, 4);
 
 
 
@@ -286,41 +286,41 @@ module.exports.getCrossSellProducts = async (req, res) => {
             const allCategoryIds = [item, ...childIds].map(id => new mongoose.Types.ObjectId(id));
 
             return await Product.aggregate([
-                { 
+                {
                     $match: {
                         product_category_id: { $in: allCategoryIds },
                         deleted: false,
                         status: "active"
-                    } 
+                    }
                 },
                 { $sample: { size: 1 } }, // MongoDB tự động trộn ngẫu nhiên TẤT CẢ kết quả và lấy ra tối đa 1 item
                 {
-                $lookup: {
-                    from: "product_reviews",
-                    localField: "_id",
-                    foreignField: "product_id",
-                    as: "reviews",
-                    pipeline: [
-                        { $project: { rating: 1, _id: 0 } }
-                    ]
-                } 
-            },
-            {
-                $addFields: {
-                    totalReviews: { $size: "$reviews" },
-                    averageRating: {
-                        $cond: {
-                            if: { $gt: [{ $size: "$reviews" }, 0] },
-                            then: { $avg: "$reviews.rating" },
-                            else: 0
+                    $lookup: {
+                        from: "product_reviews",
+                        localField: "_id",
+                        foreignField: "product_id",
+                        as: "reviews",
+                        pipeline: [
+                            { $project: { rating: 1, _id: 0 } }
+                        ]
+                    }
+                },
+                {
+                    $addFields: {
+                        totalReviews: { $size: "$reviews" },
+                        averageRating: {
+                            $cond: {
+                                if: { $gt: [{ $size: "$reviews" }, 0] },
+                                then: { $avg: "$reviews.rating" },
+                                else: 0
+                            }
                         }
                     }
+                },
+                {
+                    // Xóa mảng reviews thô và loại bỏ description nặng để API load nhanh hơn
+                    $unset: ["reviews", "description"]
                 }
-            },
-            {
-                // Xóa mảng reviews thô và loại bỏ description nặng để API load nhanh hơn
-                $unset: ["reviews", "description"]
-            }
             ]);
         });
 
@@ -345,7 +345,8 @@ module.exports.getCrossSellProducts = async (req, res) => {
 module.exports.searchProducts = async (req, res) => {
     try {
         const keyword = req.query.keyword || "";
-        
+        console.log("req.query", req.query.keyword);
+
         const find = {
             deleted: false,
             status: "active"
