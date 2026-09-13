@@ -124,13 +124,42 @@ module.exports.getProductBySlug = async (req, res) => {
             _id: product.product_category_id
         })
         
-        const productList = await Product.find({
-            deleted: false,
-            product_category_id: category._id,
-            status: "active"
-        })
-
-        const products = productList.filter(item => item._id.toString() !== product._id.toString());
+        const products = await Product.aggregate([
+            {
+                $match: {
+                    deleted: false,
+                    product_category_id: category._id,
+                    status: "active",
+                    _id: { $ne: product._id }
+                }
+            },
+            {
+                $lookup: {
+                    from: "product_reviews",
+                    localField: "_id",
+                    foreignField: "product_id",
+                    as: "reviews",
+                    pipeline: [
+                        { $project: { rating: 1, _id: 0 } }
+                    ]
+                }
+            },
+            {
+                $addFields: {
+                    totalReviews: { $size: "$reviews" },
+                    averageRating: {
+                        $cond: {
+                            if: { $gt: [{ $size: "$reviews" }, 0] },
+                            then: { $avg: "$reviews.rating" },
+                            else: 0
+                        }
+                    }
+                }
+            },
+            {
+                $unset: "reviews"
+            }
+        ]);
         return res.status(200).json({
             code: true,
             product,
