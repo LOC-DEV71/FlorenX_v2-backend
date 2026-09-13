@@ -181,7 +181,7 @@ module.exports.formSendMail = async (email, otp) => {
         </html>
     `;
 
-    sendMailHelper.sendMail(email, subject, html);
+    return await sendMailHelper.sendMail(email, subject, html);
 }
 
 

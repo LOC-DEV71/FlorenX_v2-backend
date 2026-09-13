@@ -204,7 +204,11 @@ module.exports.requestSecretOtp = async (req, res) => {
     });
     await newOtp.save();
 
-    await formSendMail.formSendMail(admin.email, otpCode);
+    const sendSuccess = await formSendMail.formSendMail(admin.email, otpCode);
+    
+    if (!sendSuccess) {
+      return res.json({ code: 400, message: "Không thể gửi email OTP lúc này. Máy chủ bị lỗi hoặc chặn cổng SMTP." });
+    }
 
     res.json({ code: 200, message: `Mã OTP đã được gửi về email ${admin.email}` });
   } catch (error) {
