@@ -4,6 +4,7 @@ const Cart = require("../../Models/cart.model");
 const ProductPreview = require("../../Models/products.preview");
 const getChildrenCategories = require("../../../../helper/getAllProductInCategoryParentId");
 const paginationHelper = require("../../../../helper/pagination.helper");
+const searchHelper = require("../../../../helper/search.helper");
 const jwt = require("../../../../utils/jwt.utils");
 const mongoose = require("mongoose");
 // const Likes = require("../../Models/likes.model");
@@ -351,7 +352,8 @@ module.exports.searchProducts = async (req, res) => {
         };
 
         if (keyword) {
-            const regex = new RegExp(keyword, "i");
+            const regexStr = searchHelper.createDiacriticRegex(keyword);
+            const regex = new RegExp(regexStr, "i");
             find.$or = [
                 { title: regex },
                 { slug: regex },
