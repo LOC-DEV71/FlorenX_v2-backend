@@ -28,8 +28,8 @@ module.exports.getProductByCategory = async (req, res) => {
         }
 
 
-        const product_category_id = productCategory._id.toString();
-        const childIds = await getChildrenCategories.getChildrenCategories(product_category_id)
+        const product_category_id = productCategory._id;
+        const childIds = await getChildrenCategories.getChildrenCategories(product_category_id);
         const categortIds = [product_category_id, ...childIds];
 
         const find = {
