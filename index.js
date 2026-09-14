@@ -23,7 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 // cho phép đọc cookie
 app.use(cookieParser());
 
-// Trust proxy (cần thiết nếu deploy qua Vercel, Nginx, Heroku...)
+// Trust proxy (cần thiết nếu deploy qua Vercel, Nginx, Heroku...) 
 app.set('trust proxy', 1);
 
 // Khởi tạo một danh sách Blacklist tạm thời trên RAM
@@ -31,7 +31,8 @@ const blockedIPs = new Set();
 
 // Middleware chặn ngay lập tức nếu IP nằm trong Blacklist
 app.use((req, res, next) => {
-    const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.ip;
+    // Với trust proxy = 1, req.ip đã là IP thật của Client (an toàn chống fake header)
+    const clientIp = req.ip;
     if (blockedIPs.has(clientIp)) {
         return res.status(403).json({ 
             code: false, 
@@ -48,14 +49,12 @@ const apiLimiter = rateLimit({
     message: { code: false, message: "Hệ thống đang bảo trì hoặc bạn thao tác quá nhanh. Vui lòng thử lại sau 1 phút!" },
     standardHeaders: true,
     legacyHeaders: false,
-    // Custom logic: Lấy IP thật chống Fake IP
     keyGenerator: (req, res) => {
-        // Lấy IP đầu tiên trong chuỗi x-forwarded-for (IP gốc của user) thay vì IP của Proxy
-        return req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.ip;
+        return req.ip; 
     },
     // Nếu vượt quá 500 req -> Ném IP đó vào Blacklist
     handler: (req, res, next, options) => {
-        const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.ip;
+        const clientIp = req.ip;
         blockedIPs.add(clientIp);
         console.log(`[DDoS ALERT] Đã đưa IP ${clientIp} vào Blacklist!`);
         res.status(429).json(options.message);
