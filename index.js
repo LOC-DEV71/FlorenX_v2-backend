@@ -45,7 +45,7 @@ app.use((req, res, next) => {
 // Cấu hình Rate Limit tổng (Chống Spam / DDoS cấp cơ bản)
 const apiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 phút
-    max: 500, // Giới hạn 500 requests mỗi IP trong 1 phút
+    max: 300, // Giới hạn 300 requests mỗi IP trong 1 phút
     message: { code: false, message: "Hệ thống đang bảo trì hoặc bạn thao tác quá nhanh. Vui lòng thử lại sau 1 phút!" },
     standardHeaders: true,
     legacyHeaders: false,
