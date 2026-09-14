@@ -1,6 +1,9 @@
 module.exports.createDiacriticRegex = (keyword) => {
     if (!keyword) return "";
     
+    // Giới hạn độ dài từ khóa (chống ReDoS CPU spam)
+    keyword = keyword.substring(0, 100);
+
     // Convert to base characters (remove all accents)
     // This handles both NFC and NFD input correctly.
     const baseKeyword = keyword

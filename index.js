@@ -29,16 +29,30 @@ app.set('trust proxy', 1);
 // Khởi tạo một danh sách Blacklist tạm thời trên RAM
 const blockedIPs = new Set();
 
-// Middleware chặn ngay lập tức nếu IP nằm trong Blacklist
+// Middleware chặn ngay lập tức nếu IP nằm trong Blacklist HOẶC User-Agent đáng ngờ
 app.use((req, res, next) => {
     // Với trust proxy = 1, req.ip đã là IP thật của Client (an toàn chống fake header)
     const clientIp = req.ip;
+    const userAgent = req.headers['user-agent'] || "";
+
+    // Chặn IP đã bị block
     if (blockedIPs.has(clientIp)) {
         return res.status(403).json({ 
             code: false, 
             message: "IP của bạn đã bị đưa vào Blacklist vĩnh viễn do nghi ngờ tấn công DDoS." 
         });
     }
+
+    // Chặn Bot/Script (Không có User-Agent hoặc dùng công cụ tự động)
+    if (!userAgent || userAgent.includes("node-fetch") || userAgent.includes("axios") || userAgent.includes("curl") || userAgent.includes("PostmanRuntime")) {
+        blockedIPs.add(clientIp); // Ném luôn vào Blacklist
+        console.log(`[BOT ALERT] Đã chặn một bot/script từ IP ${clientIp} (User-Agent: ${userAgent})`);
+        return res.status(403).json({ 
+            code: false, 
+            message: "Phát hiện công cụ tự động. Truy cập bị từ chối!" 
+        });
+    }
+
     next();
 });
 
@@ -52,7 +66,7 @@ const apiLimiter = rateLimit({
     keyGenerator: (req, res) => {
         return req.ip; 
     },
-    // Nếu vượt quá 500 req -> Ném IP đó vào Blacklist
+    // Nếu vượt quá max req -> Ném IP đó vào Blacklist
     handler: (req, res, next, options) => {
         const clientIp = req.ip;
         blockedIPs.add(clientIp);
@@ -61,8 +75,22 @@ const apiLimiter = rateLimit({
     }
 });
 
+// Cấu hình Rate Limit nghiêm ngặt cho các route nhạy cảm (Đăng nhập, OTP) - Chống Email Bombing
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 phút
+    max: 10, // Giới hạn 10 lần gửi OTP/đăng nhập mỗi 15 phút
+    message: { code: false, message: "Bạn đã thao tác quá nhiều lần. Vui lòng đợi 15 phút trước khi thử lại." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req, res) => req.ip
+});
+
 // Áp dụng Rate Limit cho tất cả các route bắt đầu bằng /api/
 app.use("/api/", apiLimiter);
+
+// Áp dụng Auth Limiter cho các route xác thực
+app.use("/api/v1/client/auth", authLimiter);
+app.use("/api/v1/admin/auth", authLimiter);
 
 dataBase.connect();
 routes(app);

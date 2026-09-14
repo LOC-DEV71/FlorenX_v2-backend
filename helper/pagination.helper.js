@@ -1,6 +1,6 @@
 module.exports.pagination = (countProducts, query, objectPagination = {}) => {
     if(query.limit){
-        objectPagination.limit = Number(query.limit);
+        objectPagination.limit = Math.min(Number(query.limit), 100);
     }
     if(query.page){
         objectPagination.currentPage = Number(query.page);
