@@ -26,6 +26,21 @@ app.use(cookieParser());
 // Trust proxy (cần thiết nếu deploy qua Vercel, Nginx, Heroku...)
 app.set('trust proxy', 1);
 
+// Khởi tạo một danh sách Blacklist tạm thời trên RAM
+const blockedIPs = new Set();
+
+// Middleware chặn ngay lập tức nếu IP nằm trong Blacklist
+app.use((req, res, next) => {
+    const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.ip;
+    if (blockedIPs.has(clientIp)) {
+        return res.status(403).json({ 
+            code: false, 
+            message: "IP của bạn đã bị đưa vào Blacklist vĩnh viễn do nghi ngờ tấn công DDoS." 
+        });
+    }
+    next();
+});
+
 // Cấu hình Rate Limit tổng (Chống Spam / DDoS cấp cơ bản)
 const apiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 phút
@@ -33,6 +48,18 @@ const apiLimiter = rateLimit({
     message: { code: false, message: "Hệ thống đang bảo trì hoặc bạn thao tác quá nhanh. Vui lòng thử lại sau 1 phút!" },
     standardHeaders: true,
     legacyHeaders: false,
+    // Custom logic: Lấy IP thật chống Fake IP
+    keyGenerator: (req, res) => {
+        // Lấy IP đầu tiên trong chuỗi x-forwarded-for (IP gốc của user) thay vì IP của Proxy
+        return req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.ip;
+    },
+    // Nếu vượt quá 500 req -> Ném IP đó vào Blacklist
+    handler: (req, res, next, options) => {
+        const clientIp = req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'].split(',')[0].trim() : req.ip;
+        blockedIPs.add(clientIp);
+        console.log(`[DDoS ALERT] Đã đưa IP ${clientIp} vào Blacklist!`);
+        res.status(429).json(options.message);
+    }
 });
 
 // Áp dụng Rate Limit cho tất cả các route bắt đầu bằng /api/
